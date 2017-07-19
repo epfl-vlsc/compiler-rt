@@ -32,7 +32,6 @@ namespace __hplgst {
 // also to protect the global list of root regions.
 BlockingMutex global_mutex(LINKER_INITIALIZED);
 
-Flags hplgst_flags;
 
 void DisableCounterUnderflow() {
   if (common_flags()->detect_leaks) {
@@ -41,18 +40,6 @@ void DisableCounterUnderflow() {
   }
 }
 
-void Flags::SetDefaults() {
-#define HPLGST_FLAG(Type, Name, DefaultValue, Description) Name = DefaultValue;
-#include "hplgst_flags.inc"
-#undef HPLGST_FLAG
-}
-
-void RegisterHplgstFlags(FlagParser *parser, Flags *f) {
-#define HPLGST_FLAG(Type, Name, DefaultValue, Description) \
-  RegisterFlag(parser, #Name, Description, &f->Name);
-#include "hplgst_flags.inc"
-#undef HPLGST_FLAG
-}
 
 #define LOG_POINTERS(...)                           \
   do {                                              \

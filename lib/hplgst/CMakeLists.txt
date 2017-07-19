@@ -10,9 +10,11 @@ set(HPLGST_COMMON_SOURCES
 
 set(HPLGST_SOURCES
   hplgst.cc
+        hplgst_flags.cc
   hplgst_allocator.cc
   hplgst_linux.cc
   hplgst_interceptors.cc
+        hplgst_interface.cpp
   hplgst_malloc_mac.cc
   hplgst_preinit.cc
   hplgst_thread.cc)

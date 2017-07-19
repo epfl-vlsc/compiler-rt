@@ -14,6 +14,7 @@
 
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
+#include "hplgst_interface_internal.h"
 
 #define GET_STACK_TRACE(max_size, fast)                                        \
   BufferedStackTrace stack;                                                    \
@@ -43,10 +44,12 @@ namespace __hplgst {
 void InitializeInterceptors();
 void ReplaceSystemMalloc();
 
+  void processRangeAccess(__sanitizer::uptr PC, __sanitizer::uptr Addr, int Size, bool IsWrite);
+
 #define ENSURE_HPLGST_INITED do {   \
   CHECK(!hplgst_init_is_running);   \
   if (!hplgst_inited)               \
-    __hplgst_init();                \
+    __hplgst_init((ToolType)0, nullptr);                \
 } while (0)
 
 }  // namespace __hplgst
@@ -54,4 +57,4 @@ void ReplaceSystemMalloc();
 extern bool hplgst_inited;
 extern bool hplgst_init_is_running;
 
-extern "C" void __hplgst_init();
+

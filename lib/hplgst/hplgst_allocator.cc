@@ -97,7 +97,7 @@ void *Reallocate(const StackTrace &stack, void *p, uptr new_size,
                  uptr alignment) {
   RegisterDeallocation(p);
   if (new_size > kMaxAllowedMallocSize) {
-    Report("WARNING: LeakSanitizer failed to allocate %zu bytes\n", new_size);
+    Report("WARNING: Heapologist failed to allocate %zu bytes\n", new_size);
     allocator.Deallocate(GetAllocatorCache(), p);
     return nullptr;
   }

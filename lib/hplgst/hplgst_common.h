@@ -50,20 +50,6 @@ enum ChunkTag {
   using namespace __sanitizer;
 const u32 kInvalidTid = (u32) -1;
 
-struct Flags {
-#define HPLGST_FLAG(Type, Name, DefaultValue, Description) Type Name;
-#include "hplgst_flags.inc"
-#undef HPLGST_FLAG
-
-  void SetDefaults();
-  uptr pointer_alignment() const {
-    return use_unaligned ? 1 : sizeof(uptr);
-  }
-};
-
-extern Flags hplgst_flags;
-inline Flags *flags() { return &hplgst_flags; }
-void RegisterHplgstFlags(FlagParser *parser, Flags *f);
 
 
 // Platform-specific functions.
