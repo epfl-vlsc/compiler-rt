@@ -60,6 +60,7 @@ void __sanitizer_print_stack_trace() {
 }
 
 void __hplgst_exit(void *Ptr) {
+  // TODO anything to do here?
   //processCompilationUnitExit(Ptr);
 }
 

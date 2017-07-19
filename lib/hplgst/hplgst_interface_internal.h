@@ -26,15 +26,11 @@
 
 extern "C" {
 
-// This should be kept consistent with LLVM's EfficiencySanitizerOptions.
-// The value is passed as a 32-bit integer by the compiler.
+// TODO find a use for a global like this or remove
 typedef enum Type : __sanitizer::u32 {
   HPLGST_Test = 0,
 } ToolType;
 
-// To handle interceptors that invoke instrumented code prior to
-// __hplgst_init() being called, the instrumentation module creates this
-// global variable specifying the tool.
 extern ToolType __hplgst_which_tool;
 
 // This function should be called at the very beginning of the process,

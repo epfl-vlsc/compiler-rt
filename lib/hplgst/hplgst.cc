@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Standalone LSan RTL.
+// This file is a part of Heapologist.
+// Standalone Hplgst RTL.
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,6 +17,7 @@
 #include "sanitizer_common/sanitizer_flag_parser.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
 #include "hplgst.h"
+#include "hplgst_allocator.h"
 
 
 
@@ -25,10 +26,12 @@ namespace __hplgst {
   using namespace __sanitizer;
 
 void processRangeAccess(uptr PC, uptr Addr, int Size, bool IsWrite) {
-  VPrintf(3, "in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
+  Printf("in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
           IsWrite ? 'w' : 'r', Addr, Size);
 
   // test if pointer owned by allocator and then process
+  bool test = allocator.PointerIsMine((void *)Addr);
+  Printf("is pointer belong to allocator: %d\n", test);
 }
 
 }  // namespace __hplgst

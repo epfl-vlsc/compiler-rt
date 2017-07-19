@@ -101,6 +101,19 @@ typedef SizeClassAllocator32<0, SANITIZER_MMAP_RANGE_SIZE, 16,
 #endif  // SANITIZER_CAN_USE_ALLOCATOR64
   typedef SizeClassAllocatorLocalCache<PrimaryAllocator> AllocatorCache;
 
+#if defined(__i386__) || defined(__arm__)
+  static const uptr kMaxAllowedMallocSize = 1UL << 30;
+#elif defined(__mips64) || defined(__aarch64__)
+  static const uptr kMaxAllowedMallocSize = 4UL << 30;
+#else
+static const uptr kMaxAllowedMallocSize = 8UL << 30;
+#endif
+  typedef LargeMmapAllocator<> SecondaryAllocator;
+  typedef CombinedAllocator<PrimaryAllocator, AllocatorCache,
+          SecondaryAllocator> Allocator;
+
+  static Allocator allocator;
+
 AllocatorCache *GetAllocatorCache();
 
 void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack);

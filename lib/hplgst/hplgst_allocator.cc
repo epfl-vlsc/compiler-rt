@@ -24,18 +24,6 @@
 extern "C" void *memset(void *ptr, int value, uptr num);
 
 namespace __hplgst {
-#if defined(__i386__) || defined(__arm__)
-static const uptr kMaxAllowedMallocSize = 1UL << 30;
-#elif defined(__mips64) || defined(__aarch64__)
-static const uptr kMaxAllowedMallocSize = 4UL << 30;
-#else
-static const uptr kMaxAllowedMallocSize = 8UL << 30;
-#endif
-typedef LargeMmapAllocator<> SecondaryAllocator;
-typedef CombinedAllocator<PrimaryAllocator, AllocatorCache,
-          SecondaryAllocator> Allocator;
-
-static Allocator allocator;
 
 void InitializeAllocator() {
   allocator.InitLinkerInitialized(
@@ -122,10 +110,13 @@ void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack) {
 }
 
 void *hplgst_malloc(uptr size, const StackTrace &stack) {
+  Printf("hplgst malloc\n");
+  //stack.Print();
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 }
 
 void hplgst_free(void *p) {
+  Printf("hplgst free\n");
   Deallocate(p);
 }
 
