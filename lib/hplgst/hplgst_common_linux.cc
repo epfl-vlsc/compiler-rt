@@ -68,7 +68,7 @@ void InitializePlatformSpecificModules() {
   }
 }
 
-static int ProcessGlobalRegionsCallback(struct dl_phdr_info *info, size_t size,
+/*static int ProcessGlobalRegionsCallback(struct dl_phdr_info *info, size_t size,
                                         void *data) {
   Frontier *frontier = reinterpret_cast<Frontier *>(data);
   for (uptr j = 0; j < info->dlpi_phnum; j++) {
@@ -83,17 +83,17 @@ static int ProcessGlobalRegionsCallback(struct dl_phdr_info *info, size_t size,
     ScanGlobalRange(begin, end, frontier);
   }
   return 0;
-}
+}*/
 
 // Scans global variables for heap pointers.
-void ProcessGlobalRegions(Frontier *frontier) {
+/*void ProcessGlobalRegions(Frontier *frontier) {
   if (!flags()->use_globals) return;
   dl_iterate_phdr(ProcessGlobalRegionsCallback, frontier);
-}
+}*/
 
 LoadedModule *GetLinker() { return linker; }
 
-void ProcessPlatformSpecificAllocations(Frontier *frontier) {}
+//void ProcessPlatformSpecificAllocations(Frontier *frontier) {}
 
 struct DoStopTheWorldParam {
   StopTheWorldCallback callback;
