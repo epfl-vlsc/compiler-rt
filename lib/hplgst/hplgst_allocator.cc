@@ -25,17 +25,23 @@ extern "C" void *memset(void *ptr, int value, uptr num);
 
 namespace __hplgst {
 
+
+static Allocator allocator;
+
 void InitializeAllocator() {
   allocator.InitLinkerInitialized(
       common_flags()->allocator_may_return_null,
       common_flags()->allocator_release_to_os_interval_ms);
 }
 
+  bool PointerIsAllocator(void * p) {
+    return allocator.PointerIsMine(p);
+  }
 void AllocatorThreadFinish() {
   allocator.SwallowCache(GetAllocatorCache());
 }
 
-static ChunkMetadata *Metadata(const void *p) {
+ChunkMetadata *Metadata(const void *p) {
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p));
 }
 
@@ -43,10 +49,13 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   if (!p) return;
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
-  m->tag = DisabledInThisThread() ? kIgnored : kDirectlyLeaked;
   m->stack_trace_id = StackDepotPut(stack);
-  m->requested_size = size;
+  m->num_reads = 0;
+  m->num_writes = 0;
+  //m->timestamp = 0; // TODO figure out fast timestamping
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
+  uptr actualsize = allocator.GetActuallyAllocatedSize(p);
+  Printf("hplgst allocate %d bytes, actual size %d bytes\n", size, actualsize);
 }
 
 static void RegisterDeallocation(void *p) {
@@ -61,7 +70,7 @@ void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
   if (size == 0)
     size = 1;
   if (size > kMaxAllowedMallocSize) {
-    Report("WARNING: LeakSanitizer failed to allocate %zu bytes\n", size);
+    Report("WARNING: Hplgst failed to allocate %zu bytes\n", size);
     return nullptr;
   }
   void *p = allocator.Allocate(GetAllocatorCache(), size, alignment);
@@ -103,6 +112,7 @@ uptr GetMallocUsableSize(const void *p) {
   ChunkMetadata *m = Metadata(p);
   if (!m) return 0;
   return m->requested_size;
+  return 0;
 }
 
 void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack) {
@@ -110,13 +120,10 @@ void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack) {
 }
 
 void *hplgst_malloc(uptr size, const StackTrace &stack) {
-  Printf("hplgst malloc\n");
-  //stack.Print();
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 }
 
 void hplgst_free(void *p) {
-  Printf("hplgst free\n");
   Deallocate(p);
 }
 
@@ -154,7 +161,7 @@ void GetAllocatorGlobalRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(allocator);
 }
 
-uptr PointsIntoChunk(void* p) {
+/*uptr PointsIntoChunk(void* p) {
   uptr addr = reinterpret_cast<uptr>(p);
   uptr chunk = reinterpret_cast<uptr>(allocator.GetBlockBeginFastLocked(p));
   if (!chunk) return 0;
@@ -170,7 +177,7 @@ uptr PointsIntoChunk(void* p) {
   if (IsSpecialCaseOfOperatorNew0(chunk, m->requested_size, addr))
     return chunk;
   return 0;
-}
+}*/
 
 uptr GetUserBegin(uptr chunk) {
   return chunk;
@@ -178,6 +185,7 @@ uptr GetUserBegin(uptr chunk) {
 
 HplgstMetadata::HplgstMetadata(uptr chunk) {
   metadata_ = Metadata(reinterpret_cast<void *>(chunk));
+  //Printf("metadata pointer is %lld\n", metadata_);
   CHECK(metadata_);
 }
 
@@ -185,27 +193,37 @@ bool HplgstMetadata::allocated() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->allocated;
 }
 
-ChunkTag HplgstMetadata::tag() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->tag;
-}
-
-void HplgstMetadata::set_tag(ChunkTag value) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->tag = value;
-}
-
-uptr HplgstMetadata::requested_size() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
-}
+  uptr HplgstMetadata::requested_size() const {
+    return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
+  }
 
 u32 HplgstMetadata::stack_trace_id() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
 }
 
+  u8 HplgstMetadata::num_reads() const {
+    return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
+  }
+  u8 HplgstMetadata::num_writes() const {
+    return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
+  }
+
+  void HplgstMetadata::incr_reads() {
+    auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
+    if (chunkmeta->num_reads < MAX_READWRITES)
+      chunkmeta->num_reads++;
+  }
+  void HplgstMetadata::incr_writes() {
+    auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
+    if (chunkmeta->num_writes < MAX_READWRITES)
+      chunkmeta->num_writes++;
+  }
+
 void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }
 
-IgnoreObjectResult IgnoreObjectLocked(const void *p) {
+/*IgnoreObjectResult IgnoreObjectLocked(const void *p) {
   void *chunk = allocator.GetBlockBegin(p);
   if (!chunk || p < chunk) return kIgnoreObjectInvalid;
   ChunkMetadata *m = Metadata(chunk);
@@ -218,7 +236,7 @@ IgnoreObjectResult IgnoreObjectLocked(const void *p) {
   } else {
     return kIgnoreObjectInvalid;
   }
-}
+}*/
 } // namespace __hplgst
 
 using namespace __hplgst;

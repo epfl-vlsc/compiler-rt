@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "sanitizer_common/sanitizer_stackdepot.h"
 #include "hplgst_interface_internal.h"
 #include "hplgst_common.h"
 #include "hplgst.h"
@@ -24,10 +25,24 @@ bool hplgst_init_is_running;
 
 using namespace __hplgst; // NOLINT
 
+void TestCb(uptr chunk, void *arg) {
+
+  int * count = (int*) arg;
+  chunk = GetUserBegin(chunk);
+  HplgstMetadata m(chunk); // in the end calls allocator.getMetadata(chunk)
+  Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
+  if (m.allocated())
+    *count += 1;
+  StackTrace stack = StackDepotGet(m.stack_trace_id());
+  //stack.Print();
+}
+
+
 extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   CHECK(!hplgst_init_is_running);
   if (hplgst_inited)
     return;
+  Printf("INIT\n");
   hplgst_init_is_running = true;
   SanitizerToolName = "Heapologist";
   CacheBinaryName();
@@ -48,6 +63,20 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
     Atexit(DoLeakCheck);
 
   //InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
+  /*Printf("about to lock T\n");
+  LockThreadRegistry();
+  Printf("about to lock A\n");
+  LockAllocator();
+  Printf("getting allocator\n");
+  uptr s = get_allocator()->TotalMemoryUsed();
+  Printf("total memory: %d\n", s);
+
+  int chunkcount = 0;
+  ForEachChunk(TestCb, &chunkcount);
+  Printf("num chunks %d\n", chunkcount);
+
+  UnlockAllocator();
+  UnlockThreadRegistry();*/
 
   hplgst_inited = true;
   hplgst_init_is_running = false;
@@ -61,6 +90,17 @@ void __sanitizer_print_stack_trace() {
 
 void __hplgst_exit(void *Ptr) {
   // TODO anything to do here?
+  Printf("Exiting!\n");
+  LockThreadRegistry();
+  LockAllocator();
+  /*uptr s = get_allocator()->TotalMemoryUsed();
+  Printf("total memory: %d\n", s);*/
+  int chunkcount = 0;
+  ForEachChunk(TestCb, &chunkcount);
+  Printf("num chunks %d\n", chunkcount);
+  UnlockAllocator();
+  UnlockThreadRegistry();
+  Printf("Done printing stacks of remaining blocks\n");
   //processCompilationUnitExit(Ptr);
 }
 

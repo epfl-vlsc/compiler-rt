@@ -39,18 +39,8 @@ struct DTLS;
 
 namespace __hplgst {
 
-// Chunk tags.
-enum ChunkTag {
-  kDirectlyLeaked = 0,  // default
-  kIndirectlyLeaked = 1,
-  kReachable = 2,
-  kIgnored = 3
-};
 
-  using namespace __sanitizer;
 const u32 kInvalidTid = (u32) -1;
-
-
 
 // Platform-specific functions.
 void InitializePlatformSpecificModules();
@@ -159,11 +149,13 @@ class HplgstMetadata {
   // Constructor accepts address of user-visible chunk.
   explicit HplgstMetadata(uptr chunk);
   bool allocated() const;
-  ChunkTag tag() const;
-  void set_tag(ChunkTag value);
   uptr requested_size() const;
+  u8 num_reads() const;
+  u8 num_writes() const;
+  void incr_writes();
+  void incr_reads();
   u32 stack_trace_id() const;
- private:
+ //private:
   void *metadata_;
 };
 

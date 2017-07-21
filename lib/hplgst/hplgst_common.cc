@@ -120,7 +120,7 @@ void EnableInThisThread() { }
 using namespace __hplgst;  // NOLINT
 
 extern "C" {
-SANITIZER_INTERFACE_ATTRIBUTE
+/*SANITIZER_INTERFACE_ATTRIBUTE
 void __hplgst_ignore_object(const void *p) {
 #if CAN_SANITIZE_LEAKS
   if (!common_flags()->detect_leaks)
@@ -137,7 +137,7 @@ void __hplgst_ignore_object(const void *p) {
   if (res == kIgnoreObjectSuccess)
     VReport(1, "__hplgst_ignore_object(): ignoring heap object at %p\n", p);
 #endif // CAN_SANITIZE_LEAKS
-}
+}*/
 
 
 SANITIZER_INTERFACE_ATTRIBUTE

@@ -46,6 +46,7 @@ void ReplaceSystemMalloc();
 
   void processRangeAccess(__sanitizer::uptr PC, __sanitizer::uptr Addr, int Size, bool IsWrite);
 
+
 #define ENSURE_HPLGST_INITED do {   \
   CHECK(!hplgst_init_is_running);   \
   if (!hplgst_inited)               \

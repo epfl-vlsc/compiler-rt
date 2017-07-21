@@ -35,19 +35,24 @@ void ForEachChunk(const Callable &callback);
 void GetAllocatorCacheRange(uptr *begin, uptr *end);
 void AllocatorThreadFinish();
 void InitializeAllocator();
+bool PointerIsAllocator(void * p);
 
 const bool kAlwaysClearMemory = true;
 
+#define MAX_READWRITES 255
+
 struct ChunkMetadata {
   u8 allocated : 8;  // Must be first.
-  ChunkTag tag : 2;
-#if SANITIZER_WORDSIZE == 64
-  uptr requested_size : 54;
-#else
-  uptr requested_size : 32;
-  uptr padding : 22;
-#endif
+  u8 num_reads;
+  u8 num_writes;
+  u8 pad;
   u32 stack_trace_id;
+  #if SANITIZER_WORDSIZE == 64
+    uptr requested_size : 64;
+  #else
+    uptr requested_size : 32;
+    uptr padding : 32;
+  #endif
 };
 
 
@@ -78,7 +83,7 @@ typedef DefaultSizeClassMap SizeClassMap;
   struct AP64 {  // Allocator64 parameters. Deliberately using a short name.
     static const uptr kSpaceBeg = kAllocatorSpace;
     static const uptr kSpaceSize = kAllocatorSize;
-    static const uptr kMetadataSize = 0;
+    static const uptr kMetadataSize = sizeof(ChunkMetadata);
     typedef __hplgst::SizeClassMap SizeClassMap;
     typedef NoOpMapUnmapCallback MapUnmapCallback;
     static const uptr kFlags = 0;
@@ -112,7 +117,6 @@ static const uptr kMaxAllowedMallocSize = 8UL << 30;
   typedef CombinedAllocator<PrimaryAllocator, AllocatorCache,
           SecondaryAllocator> Allocator;
 
-  static Allocator allocator;
 
 AllocatorCache *GetAllocatorCache();
 

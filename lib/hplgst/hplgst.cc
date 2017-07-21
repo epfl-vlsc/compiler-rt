@@ -16,23 +16,32 @@
 
 #include "sanitizer_common/sanitizer_flag_parser.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
+#include "sanitizer_common/sanitizer_stackdepot.h"
 #include "hplgst.h"
+#include "hplgst_flags.h"
 #include "hplgst_allocator.h"
 
 
 
 namespace __hplgst {
 
-  using namespace __sanitizer;
-
 void processRangeAccess(uptr PC, uptr Addr, int Size, bool IsWrite) {
   Printf("in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
           IsWrite ? 'w' : 'r', Addr, Size);
 
+  void *p = (void*)Addr;
   // test if pointer owned by allocator and then process
-  bool test = allocator.PointerIsMine((void *)Addr);
-  Printf("is pointer belong to allocator: %d\n", test);
+  if (PointerIsAllocator(p) ) {
+    HplgstMetadata m(Addr);
+    if (IsWrite) {
+      m.incr_writes();
+    } else {
+      m.incr_reads();
+    }
+
+  }
 }
+
 
 }  // namespace __hplgst
 

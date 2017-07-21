@@ -15,9 +15,9 @@
 
 #if SANITIZER_LINUX
 
-#include "lsan_allocator.h"
+#include "hplgst_allocator.h"
 
-namespace __lsan {
+namespace __hplgst {
 
 static THREADLOCAL u32 current_thread_tid = kInvalidTid;
 u32 GetCurrentThread() { return current_thread_tid; }
@@ -28,6 +28,6 @@ AllocatorCache *GetAllocatorCache() { return &allocator_cache; }
 
 void ReplaceSystemMalloc() {}
 
-} // namespace __lsan
+} // namespace __hplgst
 
 #endif // SANITIZER_LINUX
