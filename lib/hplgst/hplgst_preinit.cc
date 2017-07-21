@@ -18,5 +18,5 @@
   // We force __hplgst_init to be called before anyone else by placing it into
   // .preinit_array section.
   __attribute__((section(".preinit_array"), used))
-  void (*__local_hplgst_preinit)(void) = __hplgst_init;
+  void (*__local_hplgst_preinit)(ToolType, void*) = __hplgst_init;
 #endif

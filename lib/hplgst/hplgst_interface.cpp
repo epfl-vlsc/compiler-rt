@@ -30,11 +30,12 @@ void TestCb(uptr chunk, void *arg) {
   int * count = (int*) arg;
   chunk = GetUserBegin(chunk);
   HplgstMetadata m(chunk); // in the end calls allocator.getMetadata(chunk)
-  Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
-  if (m.allocated())
+  if (m.allocated()) {
+    Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
     *count += 1;
-  StackTrace stack = StackDepotGet(m.stack_trace_id());
-  //stack.Print();
+    StackTrace stack = StackDepotGet(m.stack_trace_id());
+    stack.Print();
+  }
 }
 
 
