@@ -41,7 +41,7 @@ void AllocatorThreadFinish() {
   allocator.SwallowCache(GetAllocatorCache());
 }
 
-ChunkMetadata *Metadata(const void *p) {
+static ChunkMetadata *Metadata(const void *p) {
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p));
 }
 
@@ -49,13 +49,15 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   if (!p) return;
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
+  m->requested_size = size; // This must always be present, or hplgst_mz_size fails (and
+                            // so does malloc_zone_from_ptr on Mac).
   m->stack_trace_id = StackDepotPut(stack);
   m->num_reads = 0;
   m->num_writes = 0;
   //m->timestamp = 0; // TODO figure out fast timestamping
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   uptr actualsize = allocator.GetActuallyAllocatedSize(p);
-  Printf("hplgst allocate %d bytes, actual size %d bytes\n", size, actualsize);
+  Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, actualsize, p, Metadata(p));
 }
 
 static void RegisterDeallocation(void *p) {
@@ -112,7 +114,6 @@ uptr GetMallocUsableSize(const void *p) {
   ChunkMetadata *m = Metadata(p);
   if (!m) return 0;
   return m->requested_size;
-  return 0;
 }
 
 void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack) {
@@ -185,7 +186,7 @@ uptr GetUserBegin(uptr chunk) {
 
 HplgstMetadata::HplgstMetadata(uptr chunk) {
   metadata_ = Metadata(reinterpret_cast<void *>(chunk));
-  //Printf("metadata pointer is %lld\n", metadata_);
+  //Printf("metadata pointer for %%lld is %lld\n", chunk, metadata_);
   CHECK(metadata_);
 }
 
@@ -193,31 +194,33 @@ bool HplgstMetadata::allocated() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->allocated;
 }
 
-  uptr HplgstMetadata::requested_size() const {
-    return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
-  }
+uptr HplgstMetadata::requested_size() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
+}
 
 u32 HplgstMetadata::stack_trace_id() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
 }
 
-  u8 HplgstMetadata::num_reads() const {
-    return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
-  }
-  u8 HplgstMetadata::num_writes() const {
-    return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
-  }
+u8 HplgstMetadata::num_reads() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
+}
 
-  void HplgstMetadata::incr_reads() {
-    auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
-    if (chunkmeta->num_reads < MAX_READWRITES)
-      chunkmeta->num_reads++;
-  }
-  void HplgstMetadata::incr_writes() {
-    auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
-    if (chunkmeta->num_writes < MAX_READWRITES)
-      chunkmeta->num_writes++;
-  }
+u8 HplgstMetadata::num_writes() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
+}
+
+void HplgstMetadata::incr_reads() {
+  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
+  if (chunkmeta->num_reads < MAX_READWRITES)
+    chunkmeta->num_reads++;
+}
+
+void HplgstMetadata::incr_writes() {
+  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
+  if (chunkmeta->num_writes < MAX_READWRITES)
+    chunkmeta->num_writes++;
+}
 
 void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
