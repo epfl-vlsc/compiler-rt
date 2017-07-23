@@ -40,6 +40,6 @@ namespace __hplgst {
 
   void InitializeFlags();
 
-} // namespace __esan
+} // namespace __hplgst
 
 #endif //LLVM_HPLGST_FLAGS_H

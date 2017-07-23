@@ -16,18 +16,11 @@
 
 #include "interception/interception.h"
 #include "sanitizer_common/sanitizer_allocator.h"
-#include "sanitizer_common/sanitizer_atomic.h"
-#include "sanitizer_common/sanitizer_common.h"
-#include "sanitizer_common/sanitizer_flags.h"
-#include "sanitizer_common/sanitizer_internal_defs.h"
-#include "sanitizer_common/sanitizer_linux.h"
 #include "sanitizer_common/sanitizer_platform_interceptors.h"
-#include "sanitizer_common/sanitizer_platform_limits_posix.h"
 #include "sanitizer_common/sanitizer_posix.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
 #include "hplgst.h"
 #include "hplgst_allocator.h"
-#include "hplgst_common.h"
 #include "hplgst_thread.h"
 
 #include <stddef.h>
@@ -202,7 +195,7 @@ INTERCEPTOR(int, mprobe, void *ptr) {
 #endif // SANITIZER_INTERCEPT_MCHECK_MPROBE
 
 #define OPERATOR_NEW_BODY                              \
-  ENSURE_HPLGST_INITED();                                  \
+  ENSURE_HPLGST_INITED();                              \
   GET_STACK_TRACE_MALLOC;                              \
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 
@@ -216,7 +209,7 @@ INTERCEPTOR_ATTRIBUTE
 void *operator new[](size_t size, std::nothrow_t const&) { OPERATOR_NEW_BODY; }
 
 #define OPERATOR_DELETE_BODY \
-  ENSURE_HPLGST_INITED();        \
+  ENSURE_HPLGST_INITED();    \
   Deallocate(ptr);
 
 INTERCEPTOR_ATTRIBUTE
@@ -263,8 +256,8 @@ extern "C" void *__hplgst_thread_start_func(void *arg) {
     Report("LeakSanitizer: failed to set thread key.\n");
     Die();
   }
-  int tid = 0;
-  while ((tid = atomic_load(&p->tid, memory_order_acquire)) == 0)
+  u32 tid = 0;
+  while ((tid = (u32)atomic_load(&p->tid, memory_order_acquire)) == 0)
     internal_sched_yield();
   SetCurrentThread(tid);
   ThreadStart(tid, GetTid());
@@ -313,7 +306,7 @@ INTERCEPTOR(int, pthread_create, void *th, void *attr,
 
 INTERCEPTOR(int, pthread_join, void *th, void **ret) {
   ENSURE_HPLGST_INITED();
-  int tid = ThreadTid((uptr)th);
+  u32 tid = ThreadTid((uptr)th);
   int res = REAL(pthread_join)(th, ret);
   if (res == 0)
     ThreadJoin(tid);

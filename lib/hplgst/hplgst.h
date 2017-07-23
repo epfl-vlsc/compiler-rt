@@ -44,10 +44,10 @@
 namespace __hplgst {
 
 void InitializeInterceptors();
+
 void ReplaceSystemMalloc();
 
-  void processRangeAccess(__sanitizer::uptr PC, __sanitizer::uptr Addr, int Size, bool IsWrite);
-
+void processRangeAccess(__sanitizer::uptr PC, __sanitizer::uptr Addr, uptr Size, bool IsWrite);
 
 #define ENSURE_HPLGST_INITED() do {   \
   CHECK(!hplgst_init_is_running);   \
@@ -59,5 +59,3 @@ void ReplaceSystemMalloc();
 
 extern bool hplgst_inited;
 extern bool hplgst_init_is_running;
-
-

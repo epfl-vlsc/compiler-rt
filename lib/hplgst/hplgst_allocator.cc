@@ -14,19 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "hplgst_allocator.h"
-
-#include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_allocator_interface.h"
-#include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
-#include "sanitizer_common/sanitizer_stacktrace.h"
-#include "hplgst_common.h"
+#include "hplgst_allocator.h"
 
 extern "C" void *memset(void *ptr, int value, uptr num);
 
 namespace __hplgst {
-
 
 static Allocator allocator;
 
@@ -36,9 +30,10 @@ void InitializeAllocator() {
       common_flags()->allocator_release_to_os_interval_ms);
 }
 
-  bool PointerIsAllocator(void * p) {
-    return allocator.PointerIsMine(p);
-  }
+bool PointerIsAllocator(void *p) {
+  return allocator.PointerIsMine(p);
+}
+
 void AllocatorThreadFinish() {
   allocator.SwallowCache(GetAllocatorCache());
 }
@@ -58,8 +53,8 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   m->num_writes = 0;
   //m->timestamp = 0; // TODO figure out fast timestamping
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
-  uptr actualsize = allocator.GetActuallyAllocatedSize(p);
-  Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, actualsize, p, Metadata(p));
+  uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
+  Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
 }
 
 static void RegisterDeallocation(void *p) {
@@ -90,13 +85,15 @@ void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
   if (cleared && allocator.FromPrimary(p))
     memset(p, 0, size);
   RegisterAllocation(stack, p, size);
-  if (&__sanitizer_malloc_hook) __sanitizer_malloc_hook(p, size);
+  if (&__sanitizer_malloc_hook)
+    __sanitizer_malloc_hook(p, size);
   RunMallocHooks(p, size);
   return p;
 }
 
 void Deallocate(void *p) {
-  if (&__sanitizer_free_hook) __sanitizer_free_hook(p);
+  if (&__sanitizer_free_hook)
+    __sanitizer_free_hook(p);
   RunFreeHooks(p);
   RegisterDeallocation(p);
   allocator.Deallocate(GetAllocatorCache(), p);
@@ -172,24 +169,6 @@ void GetAllocatorGlobalRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(allocator);
 }
 
-/*uptr PointsIntoChunk(void* p) {
-  uptr addr = reinterpret_cast<uptr>(p);
-  uptr chunk = reinterpret_cast<uptr>(allocator.GetBlockBeginFastLocked(p));
-  if (!chunk) return 0;
-  // LargeMmapAllocator considers pointers to the meta-region of a chunk to be
-  // valid, but we don't want that.
-  if (addr < chunk) return 0;
-  ChunkMetadata *m = Metadata(reinterpret_cast<void *>(chunk));
-  CHECK(m);
-  if (!m->allocated)
-    return 0;
-  if (addr < chunk + m->requested_size)
-    return chunk;
-  if (IsSpecialCaseOfOperatorNew0(chunk, m->requested_size, addr))
-    return chunk;
-  return 0;
-}*/
-
 uptr GetUserBegin(uptr chunk) {
   return chunk;
 }
@@ -236,20 +215,6 @@ void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }
 
-/*IgnoreObjectResult IgnoreObjectLocked(const void *p) {
-  void *chunk = allocator.GetBlockBegin(p);
-  if (!chunk || p < chunk) return kIgnoreObjectInvalid;
-  ChunkMetadata *m = Metadata(chunk);
-  CHECK(m);
-  if (m->allocated && (uptr)p < (uptr)chunk + m->requested_size) {
-    if (m->tag == kIgnored)
-      return kIgnoreObjectAlreadyIgnored;
-    m->tag = kIgnored;
-    return kIgnoreObjectSuccess;
-  } else {
-    return kIgnoreObjectInvalid;
-  }
-}*/
 } // namespace __hplgst
 
 using namespace __hplgst;

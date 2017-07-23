@@ -17,14 +17,12 @@
 #include "sanitizer_common/sanitizer_platform.h"
 #include "hplgst_common.h"
 
-#if CAN_SANITIZE_LEAKS && SANITIZER_MAC
+#if SANITIZER_MAC
 
 #include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "hplgst_allocator.h"
 
 #include <pthread.h>
-
-#include <mach/mach.h>
 
 namespace __hplgst {
 
@@ -66,7 +64,7 @@ static thread_local_data_t *get_tls_val(bool alloc) {
 
 bool DisabledInThisThread() {
   thread_local_data_t *data = get_tls_val(false);
-  return data ? data->disable_counter > 0 : false;
+  return data != nullptr && data->disable_counter > 0;
 }
 
 void DisableInThisThread() { ++get_tls_val(true)->disable_counter; }
@@ -95,13 +93,6 @@ LoadedModule *GetLinker() { return nullptr; }
 // required on Darwin.
 void InitializePlatformSpecificModules() {}
 
-
-
-void DoStopTheWorld(StopTheWorldCallback callback, void *argument) {
-  // is this function even needed?
-  //StopTheWorld(callback, argument);
-}
-
 } // namespace __hplgst
 
-#endif // CAN_SANITIZE_LEAKS && SANITIZER_MAC
+#endif // SANITIZER_MAC

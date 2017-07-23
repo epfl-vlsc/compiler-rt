@@ -16,12 +16,9 @@
 
 #include "hplgst_thread.h"
 
-#include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_placement_new.h"
-#include "sanitizer_common/sanitizer_thread_registry.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
 #include "hplgst_allocator.h"
-#include "hplgst_common.h"
 
 namespace __hplgst {
 
@@ -41,7 +38,7 @@ void InitializeThreadRegistry() {
     ThreadRegistry(CreateThreadContext, kMaxThreads, kThreadQuarantineSize);
 }
 
-ThreadContext::ThreadContext(int tid)
+ThreadContext::ThreadContext(u32 tid)
     : ThreadContextBase(tid),
       stack_begin_(0),
       stack_end_(0),
@@ -107,10 +104,7 @@ ThreadContext *CurrentThreadContext() {
 
 static bool FindThreadByUid(ThreadContextBase *tctx, void *arg) {
   uptr uid = (uptr)arg;
-  if (tctx->user_id == uid && tctx->status != ThreadStatusInvalid) {
-    return true;
-  }
-  return false;
+  return tctx->user_id == uid && tctx->status != ThreadStatusInvalid;
 }
 
 u32 ThreadTid(uptr uid) {

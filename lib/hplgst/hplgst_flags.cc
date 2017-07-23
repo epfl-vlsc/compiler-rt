@@ -12,11 +12,7 @@
 //
 //===----------------------------------------------------------------------===////
 
-
 #include "hplgst_flags.h"
-#include "sanitizer_common/sanitizer_common.h"
-#include "sanitizer_common/sanitizer_flag_parser.h"
-#include "sanitizer_common/sanitizer_flags.h"
 
 using namespace __sanitizer;
 

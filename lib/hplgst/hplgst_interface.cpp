@@ -17,7 +17,6 @@
 #include "hplgst_common.h"
 #include "hplgst.h"
 #include "hplgst_flags.h"
-#include "sanitizer_common/sanitizer_internal_defs.h"
 #include "hplgst_allocator.h"
 #include "hplgst_thread.h"
 

@@ -25,10 +25,10 @@ struct DTLS;
 
 namespace __hplgst {
 
-  using namespace __sanitizer;
+using namespace __sanitizer;
 class ThreadContext : public ThreadContextBase {
  public:
-  explicit ThreadContext(int tid);
+  explicit ThreadContext(u32 tid);
   void OnStarted(void *arg) override;
   void OnFinished() override;
   uptr stack_begin() { return stack_begin_; }
