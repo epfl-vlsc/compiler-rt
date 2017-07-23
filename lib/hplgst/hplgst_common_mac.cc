@@ -24,8 +24,6 @@
 
 #include <pthread.h>
 
-#include <mach/mach.h>
-
 namespace __hplgst {
 
 typedef struct {
@@ -66,7 +64,7 @@ static thread_local_data_t *get_tls_val(bool alloc) {
 
 bool DisabledInThisThread() {
   thread_local_data_t *data = get_tls_val(false);
-  return data ? data->disable_counter > 0 : false;
+  return data != nullptr && data->disable_counter > 0;
 }
 
 void DisableInThisThread() { ++get_tls_val(true)->disable_counter; }
@@ -94,13 +92,6 @@ LoadedModule *GetLinker() { return nullptr; }
 // Required on Linux for initialization of TLS behavior, but should not be
 // required on Darwin.
 void InitializePlatformSpecificModules() {}
-
-
-
-void DoStopTheWorld(StopTheWorldCallback callback, void *argument) {
-  // is this function even needed?
-  //StopTheWorld(callback, argument);
-}
 
 } // namespace __hplgst
 

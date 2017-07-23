@@ -112,11 +112,12 @@ typedef SizeClassAllocator32<0, SANITIZER_MMAP_RANGE_SIZE, 16,
 #elif defined(__mips64) || defined(__aarch64__)
   static const uptr kMaxAllowedMallocSize = 4UL << 30;
 #else
-static const uptr kMaxAllowedMallocSize = 8UL << 30;
+  static const uptr kMaxAllowedMallocSize = 8UL << 30;
 #endif
-  typedef LargeMmapAllocator<> SecondaryAllocator;
-  typedef CombinedAllocator<PrimaryAllocator, AllocatorCache,
-          SecondaryAllocator> Allocator;
+
+typedef LargeMmapAllocator<> SecondaryAllocator;
+typedef CombinedAllocator <PrimaryAllocator, AllocatorCache,
+  SecondaryAllocator> Allocator;
 
 
 AllocatorCache *GetAllocatorCache();

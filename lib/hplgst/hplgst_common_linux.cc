@@ -109,19 +109,6 @@ static int DoStopTheWorldCallback(struct dl_phdr_info *info, size_t size,
   return 1;
 }
 
-// LSan calls dl_iterate_phdr() from the tracer task. This may deadlock: if one
-// of the threads is frozen while holding the libdl lock, the tracer will hang
-// in dl_iterate_phdr() forever.
-// Luckily, (a) the lock is reentrant and (b) libc can't distinguish between the
-// tracer task and the thread that spawned it. Thus, if we run the tracer task
-// while holding the libdl lock in the parent thread, we can safely reenter it
-// in the tracer. The solution is to run stoptheworld from a dl_iterate_phdr()
-// callback in the parent thread.
-void DoStopTheWorld(StopTheWorldCallback callback, void *argument) {
-  DoStopTheWorldParam param = {callback, argument};
-  dl_iterate_phdr(DoStopTheWorldCallback, &param);
-}
-
 } // namespace __hplgst
 
 #endif // SANITIZER_LINUX
