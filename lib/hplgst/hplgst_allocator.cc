@@ -67,6 +67,14 @@ static void RegisterDeallocation(void *p) {
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
+  // get dealloc timestamp
+  if (m->num_reads != 0) {
+    Printf("this chunk had %d reads ", m->num_reads);
+  }
+  if (m->num_writes != 0) {
+    Printf("this chunk had %d writes\n", m->num_writes);
+  } else
+    Printf("\n");
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
