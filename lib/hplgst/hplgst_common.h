@@ -63,7 +63,6 @@ enum IgnoreObjectResult {
 
 // Functions called from the parent tool.
 void InitCommonHplgst();
-void DoLeakCheck();
 void DisableCounterUnderflow();
 bool DisabledInThisThread();
 

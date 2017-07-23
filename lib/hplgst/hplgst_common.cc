@@ -67,48 +67,6 @@ class Decorator: public __sanitizer::SanitizerCommonDecorator {
   const char *End() { return Default(); }
 };
 
-static inline bool CanBeAHeapPointer(uptr p) {
-  // Since our heap is located in mmap-ed memory, we can assume a sensible lower
-  // bound on heap addresses.
-  const uptr kMinAddress = 4 * 4096;
-  if (p < kMinAddress) return false;
-#if defined(__x86_64__)
-  // Accept only canonical form user-space addresses.
-  return ((p >> 47) == 0);
-#elif defined(__mips64)
-  return ((p >> 40) == 0);
-#elif defined(__aarch64__)
-  unsigned runtimeVMA =
-    (MostSignificantSetBitIndex(GET_CURRENT_FRAME()) + 1);
-  return ((p >> runtimeVMA) == 0);
-#else
-  return true;
-#endif
-}
-
-
-void DoLeakCheck() {
-  BlockingMutexLock l(&global_mutex);
-  static bool already_done;
-  if (already_done) return;
-  already_done = true;
-  /*bool have_leaks = CheckForLeaks();
-  if (!have_leaks) {
-    return;
-  }*/
-  if (common_flags()->exitcode) {
-    Die();
-  }
-}
-
-static int DoRecoverableLeakCheck() {
-  BlockingMutexLock l(&global_mutex);
-  bool have_leaks = false; //CheckForLeaks();
-  return have_leaks ? 1 : 0;
-}
-
-
-
 } // namespace __hplgst
 #else // CAN_SANITIZE_LEAKS
 namespace __hplgst {

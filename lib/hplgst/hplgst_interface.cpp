@@ -61,9 +61,6 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   ThreadStart(tid, GetTid());
   SetCurrentThread(tid);
 
-  if (common_flags()->detect_leaks && common_flags()->leak_check_at_exit)
-    Atexit(DoLeakCheck);
-
   //InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
   /*Printf("about to lock T\n");
   LockThreadRegistry();
