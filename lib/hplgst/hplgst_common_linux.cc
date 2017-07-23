@@ -17,7 +17,8 @@
 #include "sanitizer_common/sanitizer_platform.h"
 #include "hplgst_common.h"
 
-#if CAN_SANITIZE_LEAKS && SANITIZER_LINUX
+#if SANITIZER_LINUX
+
 #include <link.h>
 
 #include "sanitizer_common/sanitizer_common.h"
@@ -70,45 +71,8 @@ void InitializePlatformSpecificModules() {
   }
 }
 
-/*static int ProcessGlobalRegionsCallback(struct dl_phdr_info *info, size_t size,
-                                        void *data) {
-  Frontier *frontier = reinterpret_cast<Frontier *>(data);
-  for (uptr j = 0; j < info->dlpi_phnum; j++) {
-    const ElfW(Phdr) *phdr = &(info->dlpi_phdr[j]);
-    // We're looking for .data and .bss sections, which reside in writeable,
-    // loadable segments.
-    if (!(phdr->p_flags & PF_W) || (phdr->p_type != PT_LOAD) ||
-        (phdr->p_memsz == 0))
-      continue;
-    uptr begin = info->dlpi_addr + phdr->p_vaddr;
-    uptr end = begin + phdr->p_memsz;
-    ScanGlobalRange(begin, end, frontier);
-  }
-  return 0;
-}*/
-
-// Scans global variables for heap pointers.
-/*void ProcessGlobalRegions(Frontier *frontier) {
-  if (!flags()->use_globals) return;
-  dl_iterate_phdr(ProcessGlobalRegionsCallback, frontier);
-}*/
-
 LoadedModule *GetLinker() { return linker; }
-
-//void ProcessPlatformSpecificAllocations(Frontier *frontier) {}
-
-struct DoStopTheWorldParam {
-  StopTheWorldCallback callback;
-  void *argument;
-};
-
-static int DoStopTheWorldCallback(struct dl_phdr_info *info, size_t size,
-                                  void *data) {
-  DoStopTheWorldParam *param = reinterpret_cast<DoStopTheWorldParam *>(data);
-  StopTheWorld(param->callback, param->argument);
-  return 1;
-}
 
 } // namespace __hplgst
 
-#endif // SANITIZER_LINUX
+#endif //SANITIZER_LINUX

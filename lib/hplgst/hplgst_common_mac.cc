@@ -17,7 +17,7 @@
 #include "sanitizer_common/sanitizer_platform.h"
 #include "hplgst_common.h"
 
-#if CAN_SANITIZE_LEAKS && SANITIZER_MAC
+#if SANITIZER_MAC
 
 #include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "hplgst_allocator.h"
@@ -95,4 +95,4 @@ void InitializePlatformSpecificModules() {}
 
 } // namespace __hplgst
 
-#endif // CAN_SANITIZE_LEAKS && SANITIZER_MAC
+#endif // SANITIZER_MAC

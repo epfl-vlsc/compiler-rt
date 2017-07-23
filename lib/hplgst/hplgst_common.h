@@ -24,8 +24,6 @@
 #include "sanitizer_common/sanitizer_stoptheworld.h"
 #include "sanitizer_common/sanitizer_symbolizer.h"
 
-#define CAN_SANITIZE_LEAKS 1
-
 namespace __sanitizer {
 class FlagParser;
 struct DTLS;

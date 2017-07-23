@@ -23,51 +23,10 @@
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
 
 namespace __hplgst {
-#if CAN_SANITIZE_LEAKS
 
-// This mutex is used to prevent races between DoLeakCheck and IgnoreObject, and
-// also to protect the global list of root regions.
-BlockingMutex global_mutex(LINKER_INITIALIZED);
-
-void DisableCounterUnderflow() {
-  if (common_flags()->detect_leaks) {
-    Report("Unmatched call to __hplgst_enable().\n");
-    Die();
-  }
-}
-
-#define LOG_POINTERS(...)                           \
-  do {                                              \
-    if (flags()->log_pointers) Report(__VA_ARGS__); \
-  } while (0);
-
-#define LOG_THREADS(...)                           \
-  do {                                             \
-    if (flags()->log_threads) Report(__VA_ARGS__); \
-  } while (0);
-
-
-void InitCommonHplgst() {
-  //InitializeRootRegions();
-  InitializePlatformSpecificModules();
-}
-
-class Decorator: public __sanitizer::SanitizerCommonDecorator {
- public:
-  Decorator() : SanitizerCommonDecorator() { }
-  const char *Error() { return Red(); }
-  const char *Leak() { return Blue(); }
-  const char *End() { return Default(); }
-};
-
-#else // CAN_SANITIZE_LEAKS
-
+void DisableCounterUnderflow() { }
 void InitCommonHplgst() { }
-void DoLeakCheck() { }
-void DisableInThisThread() { }
-void EnableInThisThread() { }
 
-#endif // CAN_SANITIZE_LEAKS
 } // namespace __hplgst
 
 
