@@ -15,6 +15,7 @@ set(HPLGST_SOURCES
   hplgst_linux.cc
   hplgst_interceptors.cc
         hplgst_interface.cpp
+        hplgst_timer.cc
   hplgst_malloc_mac.cc
   hplgst_preinit.cc
   hplgst_thread.cc)

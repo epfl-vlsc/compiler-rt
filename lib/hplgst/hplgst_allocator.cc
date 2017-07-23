@@ -17,6 +17,7 @@
 #include "sanitizer_common/sanitizer_allocator_interface.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
 #include "hplgst_allocator.h"
+#include "hplgst_timer.h"
 
 extern "C" void *memset(void *ptr, int value, uptr num);
 
@@ -51,7 +52,7 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   m->stack_trace_id = StackDepotPut(stack);
   m->num_reads = 0;
   m->num_writes = 0;
-  //m->timestamp = 0; // TODO figure out fast timestamping
+  //m->timestamp = get_timestamp(); // TODO figure out fast timestamping
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
   Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
@@ -59,6 +60,7 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
 
 static void RegisterDeallocation(void *p) {
   if (!p) return;
+  //u64 ts = get_timestamp();
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
@@ -68,8 +70,8 @@ static void RegisterDeallocation(void *p) {
   }
   if (m->num_writes != 0) {
     Printf("this chunk had %d writes\n", m->num_writes);
-  } else
-    Printf("\n");
+  }
+  //Printf("this chunk lived for %lld ns\n", ts - m->timestamp);
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,

@@ -49,12 +49,13 @@ struct ChunkMetadata {
   u8 num_writes : 8;
   u8 pad : 8;
   #if SANITIZER_WORDSIZE == 64
-    uptr requested_size : 54;
+    uptr requested_size : 64;
   #else
     uptr requested_size : 32;
     uptr padding : 32;
   #endif
   u32 stack_trace_id : 32;
+  u64 timestamp;
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64
@@ -100,7 +101,7 @@ typedef FlatByteMap<kNumRegions> ByteMap;
 typedef TwoLevelByteMap<(kNumRegions >> 12), 1 << 12> ByteMap;
 # endif
 typedef CompactSizeClassMap SizeClassMap;
-typedef SizeClassAllocator32<0, SANITIZER_MMAP_RANGE_SIZE, 16,
+typedef SizeClassAllocator32<0, SANITIZER_MMAP_RANGE_SIZE, sizeof(ChunkMetadata),
   SizeClassMap, kRegionSizeLog,
   ByteMap,
   NoOpMapUnmapCallback> PrimaryAllocator;

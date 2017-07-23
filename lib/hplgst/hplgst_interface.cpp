@@ -44,7 +44,7 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   CHECK(!hplgst_init_is_running);
   if (hplgst_inited)
     return;
-  Printf("INIT\n");
+  Printf("INIT meta size is %d\n", sizeof(ChunkMetadata));
   hplgst_init_is_running = true;
   SanitizerToolName = "Heapologist";
   CacheBinaryName();
