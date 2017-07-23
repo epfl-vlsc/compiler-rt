@@ -19,6 +19,7 @@
 #include "hplgst_flags.h"
 #include "hplgst_allocator.h"
 #include "hplgst_thread.h"
+#include "hplgst_timer.h"
 
 bool hplgst_inited;
 bool hplgst_init_is_running;
@@ -44,8 +45,8 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   CHECK(!hplgst_init_is_running);
   if (hplgst_inited)
     return;
-  Printf("INIT meta size is %d\n", sizeof(ChunkMetadata));
   hplgst_init_is_running = true;
+  Printf("INIT meta size is %d\n", sizeof(ChunkMetadata));
   SanitizerToolName = "Heapologist";
   CacheBinaryName();
   AvoidCVE_2016_2143();
@@ -79,6 +80,8 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
 
   hplgst_inited = true;
   hplgst_init_is_running = false;
+  /*u64 t = get_timestamp();
+  Printf("init ts %lld\n", t);*/
 }
 
 extern "C" SANITIZER_INTERFACE_ATTRIBUTE

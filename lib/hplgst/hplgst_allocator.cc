@@ -52,7 +52,7 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   m->stack_trace_id = StackDepotPut(stack);
   m->num_reads = 0;
   m->num_writes = 0;
-  //m->timestamp = get_timestamp(); // TODO figure out fast timestamping
+  m->timestamp = get_timestamp(); // TODO figure out fast timestamping
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
   Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
@@ -60,8 +60,9 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
 
 static void RegisterDeallocation(void *p) {
   if (!p) return;
-  //u64 ts = get_timestamp();
+  u64 ts = get_timestamp();
   ChunkMetadata *m = Metadata(p);
+  u64 diff_ns = timestamp_diff(m->timestamp, ts);
   CHECK(m);
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
   // get dealloc timestamp
@@ -71,7 +72,7 @@ static void RegisterDeallocation(void *p) {
   if (m->num_writes != 0) {
     Printf("this chunk had %d writes\n", m->num_writes);
   }
-  //Printf("this chunk lived for %lld ns\n", ts - m->timestamp);
+  Printf("this chunk lived for %lld ns\n", diff_ns);
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,

@@ -23,6 +23,7 @@
 namespace __hplgst {
 
 u64 get_timestamp();
+u64 timestamp_diff(u64 start, u64 end);
 
 } // namespace hplgst
 
