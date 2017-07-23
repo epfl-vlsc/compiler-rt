@@ -7,8 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Thread registry for standalone LSan.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Thread registry for Hplgst.
 //
 //===----------------------------------------------------------------------===//
 

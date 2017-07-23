@@ -7,8 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Allocator for standalone LSan.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Allocator for Hplgst.
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,18 +45,17 @@ const bool kAlwaysClearMemory = true;
 
 struct ChunkMetadata {
   u8 allocated : 8;  // Must be first.
-  u8 num_reads;
-  u8 num_writes;
-  u8 pad;
-  u32 stack_trace_id;
+  u8 num_reads : 8;
+  u8 num_writes : 8;
+  u8 pad : 8;
   #if SANITIZER_WORDSIZE == 64
-    uptr requested_size : 64;
+    uptr requested_size : 54;
   #else
     uptr requested_size : 32;
     uptr padding : 32;
   #endif
+  u32 stack_trace_id : 32;
 };
-
 
 #if SANITIZER_CAN_USE_ALLOCATOR64
 # if defined(__powerpc64__)

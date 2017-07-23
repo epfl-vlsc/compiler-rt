@@ -7,8 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Interceptors for standalone LSan.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Interceptors for Hplgst.
 //
 //===----------------------------------------------------------------------===//
 
@@ -48,13 +50,13 @@ namespace std {
 
 #if !SANITIZER_MAC
 INTERCEPTOR(void*, malloc, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   return hplgst_malloc(size, stack);
 }
 
 INTERCEPTOR(void, free, void *p) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   hplgst_free(p);
 }
 
@@ -71,19 +73,19 @@ INTERCEPTOR(void*, calloc, uptr nmemb, uptr size) {
     return mem;
   }
   if (CallocShouldReturnNullDueToOverflow(size, nmemb)) return nullptr;
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   return hplgst_calloc(nmemb, size, stack);
 }
 
 INTERCEPTOR(void*, realloc, void *q, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   return hplgst_realloc(q, size, stack);
 }
 
 INTERCEPTOR(int, posix_memalign, void **memptr, uptr alignment, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   *memptr = hplgst_memalign(alignment, size, stack);
   // FIXME: Return ENOMEM if user requested more than max alloc size.
@@ -91,7 +93,7 @@ INTERCEPTOR(int, posix_memalign, void **memptr, uptr alignment, uptr size) {
 }
 
 INTERCEPTOR(void*, valloc, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   return hplgst_valloc(size, stack);
 }
@@ -99,14 +101,14 @@ INTERCEPTOR(void*, valloc, uptr size) {
 
 #if SANITIZER_INTERCEPT_MEMALIGN
 INTERCEPTOR(void*, memalign, uptr alignment, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   return hplgst_memalign(alignment, size, stack);
 }
 #define HPLGST_MAYBE_INTERCEPT_MEMALIGN INTERCEPT_FUNCTION(memalign)
 
 INTERCEPTOR(void *, __libc_memalign, uptr alignment, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   void *res = hplgst_memalign(alignment, size, stack);
   DTLS_on_libc_memalign(res, size);
@@ -120,7 +122,7 @@ INTERCEPTOR(void *, __libc_memalign, uptr alignment, uptr size) {
 
 #if SANITIZER_INTERCEPT_ALIGNED_ALLOC
 INTERCEPTOR(void*, aligned_alloc, uptr alignment, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   return hplgst_memalign(alignment, size, stack);
 }
@@ -131,7 +133,7 @@ INTERCEPTOR(void*, aligned_alloc, uptr alignment, uptr size) {
 
 #if SANITIZER_INTERCEPT_MALLOC_USABLE_SIZE
 INTERCEPTOR(uptr, malloc_usable_size, void *ptr) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   return GetMallocUsableSize(ptr);
 }
 #define HPLGST_MAYBE_INTERCEPT_MALLOC_USABLE_SIZE \
@@ -163,7 +165,7 @@ INTERCEPTOR(int, mallopt, int cmd, int value) {
 
 #if SANITIZER_INTERCEPT_PVALLOC
 INTERCEPTOR(void*, pvalloc, uptr size) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   GET_STACK_TRACE_MALLOC;
   uptr PageSize = GetPageSizeCached();
   size = RoundUpTo(size, PageSize);
@@ -200,7 +202,7 @@ INTERCEPTOR(int, mprobe, void *ptr) {
 #endif // SANITIZER_INTERCEPT_MCHECK_MPROBE
 
 #define OPERATOR_NEW_BODY                              \
-  ENSURE_HPLGST_INITED;                                  \
+  ENSURE_HPLGST_INITED();                                  \
   GET_STACK_TRACE_MALLOC;                              \
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 
@@ -214,7 +216,7 @@ INTERCEPTOR_ATTRIBUTE
 void *operator new[](size_t size, std::nothrow_t const&) { OPERATOR_NEW_BODY; }
 
 #define OPERATOR_DELETE_BODY \
-  ENSURE_HPLGST_INITED;        \
+  ENSURE_HPLGST_INITED();        \
   Deallocate(ptr);
 
 INTERCEPTOR_ATTRIBUTE
@@ -272,7 +274,7 @@ extern "C" void *__hplgst_thread_start_func(void *arg) {
 
 INTERCEPTOR(int, pthread_create, void *th, void *attr,
             void *(*callback)(void *), void *param) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   EnsureMainThreadIDIsCorrect();
   __sanitizer_pthread_attr_t myattr;
   if (!attr) {
@@ -310,7 +312,7 @@ INTERCEPTOR(int, pthread_create, void *th, void *attr,
 }
 
 INTERCEPTOR(int, pthread_join, void *th, void **ret) {
-  ENSURE_HPLGST_INITED;
+  ENSURE_HPLGST_INITED();
   int tid = ThreadTid((uptr)th);
   int res = REAL(pthread_join)(th, ret);
   if (res == 0)

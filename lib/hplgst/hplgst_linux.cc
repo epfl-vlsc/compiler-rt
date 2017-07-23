@@ -1,4 +1,4 @@
-//=-- lsan_linux.cc -------------------------------------------------------===//
+//=-- hplgst_linux.cc -------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer. Linux-specific code.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Linux-specific malloc interception..
 //
 //===----------------------------------------------------------------------===//
 

@@ -7,8 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Private LSan header.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Private Hplgst header.
 //
 //===----------------------------------------------------------------------===//
 

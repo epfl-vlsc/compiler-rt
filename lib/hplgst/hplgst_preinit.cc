@@ -7,9 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
 //
 // Call __hplgst_init at the very early stage of process startup.
+//
 //===----------------------------------------------------------------------===//
 
 #include "hplgst.h"

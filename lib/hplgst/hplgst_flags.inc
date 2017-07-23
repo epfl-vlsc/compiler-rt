@@ -7,9 +7,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// LSan runtime flags.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Hplgst runtime flags.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef HPLGST_FLAG
 # error "Define HPLGST_FLAG prior to including this file!"
 #endif

@@ -7,7 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
 // See hplgst_thread.h for details.
 //
 //===----------------------------------------------------------------------===//

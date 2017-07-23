@@ -7,8 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Private header for standalone LSan RTL.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Private header for Hplgst RTL.
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,7 +49,7 @@ void ReplaceSystemMalloc();
   void processRangeAccess(__sanitizer::uptr PC, __sanitizer::uptr Addr, int Size, bool IsWrite);
 
 
-#define ENSURE_HPLGST_INITED do {   \
+#define ENSURE_HPLGST_INITED() do {   \
   CHECK(!hplgst_init_is_running);   \
   if (!hplgst_inited)               \
     __hplgst_init((ToolType)0, nullptr);                \

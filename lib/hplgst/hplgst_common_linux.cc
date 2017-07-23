@@ -7,8 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer.
-// Implementation of common leak checking functionality. Linux-specific code.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
+//
+// Implementation of common functionality. Linux-specific code.
 //
 //===----------------------------------------------------------------------===//
 

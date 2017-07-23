@@ -7,7 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of EfficiencySanitizer, a family of performance tuners.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
 //
 //===----------------------------------------------------------------------===//
 

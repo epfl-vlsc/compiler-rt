@@ -7,7 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of LeakSanitizer (LSan), a memory leak detector.
+// This file is a part of Heapologist.
+// Stuart Byma, EPFL.
 //
 // Mac-specific malloc interception.
 //===----------------------------------------------------------------------===//
@@ -21,7 +22,7 @@
 
 using namespace __hplgst;
 #define COMMON_MALLOC_ZONE_NAME "hplgst"
-#define COMMON_MALLOC_ENTER() ENSURE_HPLGST_INITED
+#define COMMON_MALLOC_ENTER() ENSURE_HPLGST_INITED()
 #define COMMON_MALLOC_SANITIZER_INITIALIZED hplgst_inited
 #define COMMON_MALLOC_FORCE_LOCK()
 #define COMMON_MALLOC_FORCE_UNLOCK()
