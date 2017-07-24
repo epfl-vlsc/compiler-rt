@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sanitizer_common/sanitizer_stackdepot.h"
 #include "hplgst_interface_internal.h"
+#include "hplgst_stackdepot.h"
 #include "hplgst_common.h"
 #include "hplgst.h"
 #include "hplgst_flags.h"
@@ -35,11 +35,22 @@ void TestCb(uptr chunk, void *arg) {
   if (m.allocated()) {
     //Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
     *count += 1;
-    //StackTrace stack = StackDepotGet(m.stack_trace_id());
-    //stack.Print();
+    HplgstStackDepotHandle handle = HplgstStackDepotGetHandle(m.stack_trace_id());
+    StackTrace stack = handle.trace();
+    stack.Print();
   }
 }
 
+void TestStackCb(HplgstStackDepotHandle& handle, void* arg) {
+
+  Printf("Allocation Point:\n");
+  handle.trace().Print();
+  Printf("allocated the following chunks:\n");
+  handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+    Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld \n",
+            chunk.size, chunk.num_reads, chunk.num_writes, timestamp_diff(chunk.timestamp_start, chunk.timestamp_end));
+  }, arg);
+}
 
 extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   CHECK(!hplgst_init_is_running);
@@ -97,12 +108,17 @@ void __hplgst_exit(void *Ptr) {
   LockAllocator();
   /*uptr s = get_allocator()->TotalMemoryUsed();
   Printf("total memory: %d\n", s);*/
-  int chunkcount = 0;
-  ForEachChunk(TestCb, &chunkcount);
-  Printf("num chunks %d\n", chunkcount);
+  //int chunkcount = 0;
+  //ForEachChunk(TestCb, &chunkcount);
+  //Printf("num chunks %d\n", chunkcount);
+  HplgstStackDepot_ForEachStackTrace(TestStackCb, nullptr);
   UnlockAllocator();
   UnlockThreadRegistry();
   Printf("Done printing stacks of remaining blocks\n");
+
+  // TODO
+  // update stacktrace mappings with info from still-allocated chunks
+
   //processCompilationUnitExit(Ptr);
 }
 

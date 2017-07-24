@@ -26,10 +26,13 @@ class StackDepotBase {
  public:
   typedef typename Node::args_type args_type;
   typedef typename Node::handle_type handle_type;
+  typedef void (*ForEachStackTraceCb) (handle_type& handle, void* arg);
   // Maps stack trace to an unique id.
   handle_type Put(args_type args, bool *inserted = nullptr);
   // Retrieves a stored stack trace by the id.
   args_type Get(u32 id);
+  handle_type GetHandle(u32 id);
+  void ForEach(ForEachStackTraceCb func, void* arg);
 
   StackDepotStats *GetStats() { return &stats; }
 
@@ -55,6 +58,20 @@ class StackDepotBase {
   StackDepotStats stats;
 
   friend class StackDepotReverseMap;
+};
+
+template <class Node, int kReservedBits, int kTabSizeLog>
+void StackDepotBase<Node, kReservedBits, kTabSizeLog>::ForEach(ForEachStackTraceCb func,
+                                                               void* arg) {
+  for (int idx = 0; idx < kTabSize; idx++) {
+    atomic_uintptr_t *p = &tab[idx];
+    uptr v = atomic_load(p, memory_order_consume);
+    Node *s = (Node*)(v & ~1);
+    for (; s; s = s->link) {
+      handle_type handle = s->get_handle();
+      func(handle, arg);
+    }
+  }
 };
 
 template <class Node, int kReservedBits, int kTabSizeLog>
@@ -155,6 +172,30 @@ StackDepotBase<Node, kReservedBits, kTabSizeLog>::Get(u32 id) {
     }
   }
   return args_type();
+}
+
+template <class Node, int kReservedBits, int kTabSizeLog>
+typename StackDepotBase<Node, kReservedBits, kTabSizeLog>::handle_type
+StackDepotBase<Node, kReservedBits, kTabSizeLog>::GetHandle(u32 id) {
+  if (id == 0) {
+    return handle_type();
+  }
+  CHECK_EQ(id & (((u32)-1) >> kReservedBits), id);
+  // High kPartBits contain part id, so we need to scan at most kPartSize lists.
+  uptr part = id >> kPartShift;
+  for (int i = 0; i != kPartSize; i++) {
+    uptr idx = part * kPartSize + i;
+    CHECK_LT(idx, kTabSize);
+    atomic_uintptr_t *p = &tab[idx];
+    uptr v = atomic_load(p, memory_order_consume);
+    Node *s = (Node *)(v & ~1);
+    for (; s; s = s->link) {
+      if (s->id == id) {
+        return s->get_handle();
+      }
+    }
+  }
+  return handle_type();
 }
 
 template <class Node, int kReservedBits, int kTabSizeLog>
