@@ -26,30 +26,36 @@ bool hplgst_init_is_running;
 
 using namespace __hplgst; // NOLINT
 
-void TestCb(uptr chunk, void *arg) {
+void AddStillAllocatedCb(uptr chunk, void *arg) {
 
-  int * count = (int*) arg;
+  u64 end_ts = *(u64*)arg;
   chunk = GetUserBegin(chunk);
   HplgstMetadata m(chunk); // in the end calls allocator.getMetadata(chunk)
   // at the end, we only care about chunks that are still allocated
   if (m.allocated()) {
     //Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
-    *count += 1;
     HplgstStackDepotHandle handle = HplgstStackDepotGetHandle(m.stack_trace_id());
-    StackTrace stack = handle.trace();
-    stack.Print();
+    HplgstMemoryChunk& chunk = handle.new_chunk();
+    chunk.allocated = 1;
+    chunk.timestamp_start = m.timestamp_start();
+    chunk.timestamp_end = end_ts;
+    chunk.size = m.requested_size();
+    chunk.num_writes = m.num_writes();
+    chunk.num_reads = m.num_reads();
   }
 }
 
 void TestStackCb(HplgstStackDepotHandle& handle, void* arg) {
 
-  Printf("Allocation Point:\n");
+  Printf("---------- Allocation Point: ----------\n");
   handle.trace().Print();
   Printf("allocated the following chunks:\n");
   handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
-    Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld \n",
-            chunk.size, chunk.num_reads, chunk.num_writes, timestamp_diff(chunk.timestamp_start, chunk.timestamp_end));
+    Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
+           chunk.size, chunk.num_reads, chunk.num_writes,
+           timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
   }, arg);
+  Printf("---------------------------------------\n");
 }
 
 extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
@@ -106,11 +112,12 @@ void __hplgst_exit(void *Ptr) {
   Printf("Exiting!\n");
   LockThreadRegistry();
   LockAllocator();
-  /*uptr s = get_allocator()->TotalMemoryUsed();
-  Printf("total memory: %d\n", s);*/
-  //int chunkcount = 0;
-  //ForEachChunk(TestCb, &chunkcount);
-  //Printf("num chunks %d\n", chunkcount);
+
+  // add remaining still-allocated chunks to the stack depot
+  // structure, use program end as the end timestamp
+  u64 end_ts = get_timestamp();
+  ForEachChunk(AddStillAllocatedCb, &end_ts);
+
   HplgstStackDepot_ForEachStackTrace(TestStackCb, nullptr);
   UnlockAllocator();
   UnlockThreadRegistry();

@@ -206,6 +206,10 @@ u32 HplgstMetadata::stack_trace_id() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
 }
 
+u64 HplgstMetadata::timestamp_start() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->timestamp;
+}
+
 u8 HplgstMetadata::num_reads() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
 }
