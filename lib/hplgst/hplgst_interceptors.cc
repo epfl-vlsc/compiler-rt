@@ -316,6 +316,8 @@ INTERCEPTOR(int, pthread_join, void *th, void **ret) {
 namespace __hplgst {
 
 void InitializeInterceptors() {
+
+  // TODO add range access function interceptors (memset, etc. )
   INTERCEPT_FUNCTION(malloc);
   INTERCEPT_FUNCTION(free);
   HPLGST_MAYBE_INTERCEPT_CFREE;
