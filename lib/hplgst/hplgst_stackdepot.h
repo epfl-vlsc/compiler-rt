@@ -20,23 +20,30 @@
 
 namespace __hplgst {
 
-  struct HplgstMemoryChunk {
-    HplgstMemoryChunk(u8 n_reads, u8 n_writes, u8 allocd,
-                      u64 sz, u64 ts_start, u64 ts_end) : num_reads(n_reads), num_writes(n_writes),
-                                        allocated(allocd), size(sz),
-                                        timestamp_start(ts_start), timestamp_end(ts_end) {}
-    HplgstMemoryChunk() : num_reads(0), num_writes(0), allocated(0), size(0),
-                          timestamp_start(0), timestamp_end(0) {}
-    u8 num_reads;
-    u8 num_writes;
-    u8 allocated;
-    u8 pad;
-    u64 size;
-    u64 timestamp_start;
-    u64 timestamp_end;
-  };
+struct HplgstMemoryChunk {
+  HplgstMemoryChunk(u8 n_reads, u8 n_writes, u8 allocd,
+                    u64 sz, u64 ts_start, u64 ts_end) : num_reads(n_reads), num_writes(n_writes),
+                                      allocated(allocd), size(sz),
+                                      timestamp_start(ts_start), timestamp_end(ts_end) {}
+  HplgstMemoryChunk() : num_reads(0), num_writes(0), allocated(0), size(0),
+                        timestamp_start(0), timestamp_end(0) {}
+  u8 num_reads;
+  u8 num_writes;
+  u8 allocated;
+  u8 pad;
+  u64 size;
+  u64 timestamp_start;
+  u64 timestamp_end;
+};
 
-  typedef void (*ForEachMemChunkCb) (HplgstMemoryChunk& chunk, void* arg);
+typedef void (*ForEachMemChunkCb) (HplgstMemoryChunk& chunk, void* arg);
+
+enum Inefficiency : u64 {
+  Unused = 0x1,
+  WriteOnly = 0x2,
+  ReadOnly = 0x4,
+  ShortLifetime = 0x8
+};
 
 // StackDepot efficiently stores huge amounts of stack traces.
 struct HplgstStackDepotNode;
@@ -53,6 +60,9 @@ struct HplgstStackDepotHandle {
   void ForEachChunk(ForEachMemChunkCb func, void* arg);
   bool TraceHasMain();
   uptr total_chunks();
+  void add_inefficiency(Inefficiency i);
+  bool has_inefficiency(Inefficiency i);
+  bool has_inefficiencies();
 };
 
 

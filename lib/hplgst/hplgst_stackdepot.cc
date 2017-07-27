@@ -29,6 +29,7 @@ struct HplgstStackDepotNode {
   u32 tag;
   // hplgst stats
   ChunkVec* chunk_vec = nullptr;
+  u64 inefficiencies = 0; // bit vector of Inefficiency enum
   uptr stack[1];  // [size]
 
 
@@ -146,6 +147,19 @@ bool HplgstStackDepotHandle::TraceHasMain() {
   }
   return false;
 }
+
+  void HplgstStackDepotHandle::add_inefficiency(Inefficiency i) {
+    node_->inefficiencies |= i;
+  }
+
+  bool HplgstStackDepotHandle::has_inefficiency(Inefficiency i) {
+    return node_->inefficiencies & i;
+  }
+
+  bool HplgstStackDepotHandle::has_inefficiencies() {
+    return node_->inefficiencies != 0;
+  }
+
 
 // FIXME(dvyukov): this single reserved bit is used in TSan.
 typedef StackDepotBase<HplgstStackDepotNode, 1, HplgstStackDepotNode::kTabSizeLog>

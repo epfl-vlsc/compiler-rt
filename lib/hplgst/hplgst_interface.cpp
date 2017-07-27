@@ -54,7 +54,6 @@ void FindUnusedAllocsCb(HplgstStackDepotHandle& handle, void* arg) {
 
   // don't include stack traces that don't originate from main()
   if (!handle.TraceHasMain()) {
-    //Printf("Trace does not have main()\n");
     return;
   }
 
@@ -69,16 +68,60 @@ void FindUnusedAllocsCb(HplgstStackDepotHandle& handle, void* arg) {
   }, &total_writes);
 
   if (total_reads == 0 || total_writes == 0) {
+    if (total_writes > 0) {
+      handle.add_inefficiency(Inefficiency::WriteOnly);
+    } else if (total_reads > 0) {
+      handle.add_inefficiency(Inefficiency::ReadOnly);
+    } else {
+      handle.add_inefficiency(Inefficiency::Unused);
+    }
+  }
 
+}
+
+// TODO could make this relative to actual program lifetime?
+#define BAD_LIFETIME_MIN 1000000  // 1 millisecond
+
+// a ForEachStackTrace callback
+void FindShortLifetimeAllocs(HplgstStackDepotHandle& handle, void* arg) {
+
+  // Currently flags an allocation point that produces *any* short
+  // lived chunks
+
+  // don't include stack traces that don't originate from main()
+  // TODO do this once and filter them up front
+  if (!handle.TraceHasMain()) {
+    return;
+  }
+
+  u64 min_lifetime = UINT64_MAX;
+  handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+    u64* cur_min = (u64*)arg;
+    u64 lifetime = timestamp_diff(chunk.timestamp_start, chunk.timestamp_end);
+    if (lifetime < *cur_min)
+      *cur_min = lifetime;
+  }, &min_lifetime);
+
+  if (min_lifetime < BAD_LIFETIME_MIN) {
+    handle.add_inefficiency(Inefficiency::ShortLifetime);
+  }
+
+}
+
+// a ForEachStackTrace callback
+void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
+  if (handle.has_inefficiencies()) {
     Printf("---------- Allocation Point: ----------\n");
     handle.trace().Print();
-    if (total_writes > 0)
-      Printf("Produces write-only chunks:\n");
-    else if (total_reads > 0)
-      Printf("Produces read-only chunks:\n");
-    else
-      Printf("Produces totally unused chunks (but may be from un-instrumented code):\n");
-    Printf("Total chunks from this allocation point: %d\n", handle.total_chunks());
+    if (handle.has_inefficiency(Inefficiency::Unused))
+      Printf("--> Produces totally unused chunks (but may be from un-instrumented code)\n");
+    if (handle.has_inefficiency(Inefficiency::ReadOnly))
+      Printf("--> Produces read-only chunks:\n");
+    if (handle.has_inefficiency(Inefficiency::WriteOnly))
+      Printf("--> Produces write-only chunks:\n");
+    if (handle.has_inefficiency(Inefficiency::ShortLifetime))
+      Printf("--> Allocates chunks with very short lifetimes ( < %lld ms )\n", BAD_LIFETIME_MIN/1000000);
+
     // TODO if some verbose level output the individual chunks
     handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
       Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
@@ -86,16 +129,16 @@ void FindUnusedAllocsCb(HplgstStackDepotHandle& handle, void* arg) {
              timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
     }, arg);
     Printf("---------------------------------------\n");
-  }
 
+  }
 }
+
 
 extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   CHECK(!hplgst_init_is_running);
   if (hplgst_inited)
     return;
   hplgst_init_is_running = true;
-  //Printf("INIT meta size is %d\n", sizeof(ChunkMetadata));
   SanitizerToolName = "Heapologist";
   CacheBinaryName();
   AvoidCVE_2016_2143();
@@ -112,25 +155,9 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   SetCurrentThread(tid);
 
   //InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
-  /*Printf("about to lock T\n");
-  LockThreadRegistry();
-  Printf("about to lock A\n");
-  LockAllocator();
-  Printf("getting allocator\n");
-  uptr s = get_allocator()->TotalMemoryUsed();
-  Printf("total memory: %d\n", s);
-
-  int chunkcount = 0;
-  ForEachChunk(TestCb, &chunkcount);
-  Printf("num chunks %d\n", chunkcount);
-
-  UnlockAllocator();
-  UnlockThreadRegistry();*/
 
   hplgst_inited = true;
   hplgst_init_is_running = false;
-  /*u64 t = get_timestamp();
-  Printf("init ts %lld\n", t);*/
 }
 
 extern "C" SANITIZER_INTERFACE_ATTRIBUTE
@@ -140,8 +167,6 @@ void __sanitizer_print_stack_trace() {
 }
 
 void __hplgst_exit(void *Ptr) {
-  // TODO anything to do here?
-  //Printf("Exiting!\n");
   LockThreadRegistry();
   LockAllocator();
 
@@ -151,14 +176,11 @@ void __hplgst_exit(void *Ptr) {
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
   HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
+  HplgstStackDepot_ForEachStackTrace(FindShortLifetimeAllocs, nullptr);
+  HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
 
   UnlockAllocator();
   UnlockThreadRegistry();
-
-  // TODO
-  // update stacktrace mappings with info from still-allocated chunks
-
-  //processCompilationUnitExit(Ptr);
 }
 
 void __hplgst_aligned_load1(void *Addr) {
