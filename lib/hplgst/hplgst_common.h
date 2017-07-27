@@ -143,6 +143,7 @@ class HplgstMetadata {
   void incr_reads();
   u32 stack_trace_id() const;
   u64 timestamp_start() const;
+  void set_latest_timestamp(u64 ts);
  //private:
   void *metadata_;
 };

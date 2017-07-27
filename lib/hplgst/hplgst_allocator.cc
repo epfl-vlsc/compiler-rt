@@ -54,9 +54,10 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   m->num_reads = 0;
   m->num_writes = 0;
   m->timestamp = get_timestamp();
+  m->latest_timestamp = m->timestamp;
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
-  uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
-  Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
+  //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
+  //Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
 }
 
 static void RegisterDeallocation(void *p) {
@@ -208,6 +209,10 @@ u32 HplgstMetadata::stack_trace_id() const {
 
 u64 HplgstMetadata::timestamp_start() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->timestamp;
+}
+
+void HplgstMetadata::set_latest_timestamp(u64 ts) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp = ts;
 }
 
 u8 HplgstMetadata::num_reads() const {

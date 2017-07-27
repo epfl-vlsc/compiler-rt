@@ -15,6 +15,7 @@
 
 #include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_stackdepotbase.h"
+#include "sanitizer_common/sanitizer_symbolizer.h"
 
 namespace __hplgst {
 
@@ -119,11 +120,31 @@ HplgstMemoryChunk& HplgstStackDepotHandle::new_chunk() {
   return vec->back();
 }
 
+uptr HplgstStackDepotHandle::total_chunks() {
+  return node_->chunk_vec->size();
+}
+
 void HplgstStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
   auto vec = node_->chunk_vec;
   for (auto i = 0; i < vec->size(); i++) {
     func((*vec)[i], arg);
   }
+}
+
+bool HplgstStackDepotHandle::TraceHasMain() {
+
+  for (uptr i = 0; i < node_->size && node_->stack[i]; i++) {
+    uptr pc = StackTrace::GetPreviousInstructionPc(node_->stack[i]);
+    SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
+    CHECK(frames);
+    for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
+      if (cur->info.function && internal_strstr(cur->info.function, "main") != nullptr){
+        return true;
+      }
+    }
+    frames->ClearAll();
+  }
+  return false;
 }
 
 // FIXME(dvyukov): this single reserved bit is used in TSan.

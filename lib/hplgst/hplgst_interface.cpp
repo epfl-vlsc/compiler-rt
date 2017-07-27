@@ -26,6 +26,7 @@ bool hplgst_init_is_running;
 
 using namespace __hplgst; // NOLINT
 
+// a ForEachChunk callback
 void AddStillAllocatedCb(uptr chunk, void *arg) {
 
   u64 end_ts = *(u64*)arg;
@@ -45,17 +46,48 @@ void AddStillAllocatedCb(uptr chunk, void *arg) {
   }
 }
 
-void TestStackCb(HplgstStackDepotHandle& handle, void* arg) {
+// a ForEachStackTrace callback
+void FindUnusedAllocsCb(HplgstStackDepotHandle& handle, void* arg) {
 
-  Printf("---------- Allocation Point: ----------\n");
-  handle.trace().Print();
-  Printf("allocated the following chunks:\n");
+  // tally total reads and writes to chunks produced by this alloc point
+  // we try to find points that produce basically unused allocs
+
+  // don't include stack traces that don't originate from main()
+  if (!handle.TraceHasMain()) {
+    //Printf("Trace does not have main()\n");
+    return;
+  }
+
+  int total_reads = 0, total_writes = 0;
   handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
-    Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
-           chunk.size, chunk.num_reads, chunk.num_writes,
-           timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
-  }, arg);
-  Printf("---------------------------------------\n");
+    int* r = (int*)arg;
+    *r += (int) chunk.num_reads;
+  }, &total_reads);
+  handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+    int* w = (int*)arg;
+    *w += (int) chunk.num_writes;
+  }, &total_writes);
+
+  if (total_reads == 0 || total_writes == 0) {
+
+    Printf("---------- Allocation Point: ----------\n");
+    handle.trace().Print();
+    if (total_writes > 0)
+      Printf("Produces write-only chunks:\n");
+    else if (total_reads > 0)
+      Printf("Produces read-only chunks:\n");
+    else
+      Printf("Produces totally unused chunks (but may be from un-instrumented code):\n");
+    Printf("Total chunks from this allocation point: %d\n", handle.total_chunks());
+    // TODO if some verbose level output the individual chunks
+    handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+      Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
+             chunk.size, chunk.num_reads, chunk.num_writes,
+             timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
+    }, arg);
+    Printf("---------------------------------------\n");
+  }
+
 }
 
 extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
@@ -63,7 +95,7 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   if (hplgst_inited)
     return;
   hplgst_init_is_running = true;
-  Printf("INIT meta size is %d\n", sizeof(ChunkMetadata));
+  //Printf("INIT meta size is %d\n", sizeof(ChunkMetadata));
   SanitizerToolName = "Heapologist";
   CacheBinaryName();
   AvoidCVE_2016_2143();
@@ -109,7 +141,7 @@ void __sanitizer_print_stack_trace() {
 
 void __hplgst_exit(void *Ptr) {
   // TODO anything to do here?
-  Printf("Exiting!\n");
+  //Printf("Exiting!\n");
   LockThreadRegistry();
   LockAllocator();
 
@@ -118,10 +150,10 @@ void __hplgst_exit(void *Ptr) {
   u64 end_ts = get_timestamp();
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
-  HplgstStackDepot_ForEachStackTrace(TestStackCb, nullptr);
+  HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
+
   UnlockAllocator();
   UnlockThreadRegistry();
-  Printf("Done printing stacks of remaining blocks\n");
 
   // TODO
   // update stacktrace mappings with info from still-allocated chunks

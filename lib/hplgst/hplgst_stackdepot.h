@@ -51,6 +51,8 @@ struct HplgstStackDepotHandle {
   StackTrace trace();
   HplgstMemoryChunk& new_chunk();
   void ForEachChunk(ForEachMemChunkCb func, void* arg);
+  bool TraceHasMain();
+  uptr total_chunks();
 };
 
 

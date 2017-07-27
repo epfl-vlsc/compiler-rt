@@ -22,9 +22,6 @@
 // This header should NOT include any other headers.
 // All functions in this header are extern "C" and start with __hplgst_.
 
-//using __sanitizer::uptr;
-//using __sanitizer::u32;
-
 extern "C" {
 
 // TODO find a use for a global like this or remove
