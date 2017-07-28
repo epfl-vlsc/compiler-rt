@@ -29,6 +29,9 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   if (PointerIsAllocator(p) ) {
     HplgstMetadata m(Addr);
     u64 ts = get_timestamp();
+    if (m.first_timestamp() == 0)
+      m.set_first_timestamp(ts);
+
     m.set_latest_timestamp(ts);
     if (IsWrite) {
       m.incr_writes();

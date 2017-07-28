@@ -43,6 +43,90 @@ void AddStillAllocatedCb(uptr chunk, void *arg) {
     chunk.size = m.requested_size();
     chunk.num_writes = m.num_writes();
     chunk.num_reads = m.num_reads();
+    chunk.timestamp_first_access = m.first_timestamp();
+    chunk.timestamp_last_access = m.latest_timestamp();
+  }
+}
+
+// TODO make editable from cmd line
+#define REALLOC_INCREASE_RUN_MIN 3
+
+struct FindReallocsMeta {
+  u64 last_size = 0;
+  u32 current_run = 0;
+  u32 longest_run = 0;
+};
+
+// a ForEachStackTrace callback
+void FindBadReallocsCb(HplgstStackDepotHandle& handle, void* arg) {
+
+  // find instances where chunk size from the same allocation point
+  // continually increase --> implying an up front, large allocation
+  // would be better
+  // we allow for multiple "runs" because the allocation point could be
+  // in a loop
+
+  // don't include stack traces that don't originate from main()
+  if (!handle.TraceHasMain()) {
+    return;
+  }
+
+  FindReallocsMeta meta;
+  handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+    FindReallocsMeta* cur = (FindReallocsMeta*) arg;
+    if (cur->last_size == 0) {
+      cur->last_size = chunk.size;
+      cur->current_run++;
+      return;
+    }
+    if (chunk.size > cur->last_size) {
+      cur->last_size = chunk.size;
+      cur->current_run++;
+    } else {
+      cur->longest_run = cur->current_run > cur->longest_run ? cur->current_run : cur->longest_run;
+      cur->current_run = 0;
+      cur->last_size = chunk.size;
+    }
+  }, &meta);
+
+  if (meta.longest_run >= REALLOC_INCREASE_RUN_MIN) {
+    handle.add_inefficiency(Inefficiency::IncreasingReallocs);
+  }
+}
+// a ForEachStackTrace callback
+void FindEarlyAllocLateFreeCb(HplgstStackDepotHandle& handle, void* arg) {
+
+  // find instances where the first access is over half the lifetime
+  // of the chunk
+
+  // don't include stack traces that don't originate from main()
+  if (!handle.TraceHasMain()) {
+    return;
+  }
+
+  bool has_early_alloc = false;
+  handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+    if (chunk.timestamp_first_access - chunk.timestamp_start >
+            (chunk.timestamp_end - chunk.timestamp_start) / 2) {
+      bool* has_early = (bool*) arg;
+      *has_early = true;
+    }
+  }, &has_early_alloc);
+
+  bool has_late_free = false;
+  handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
+    if (chunk.timestamp_end - chunk.timestamp_last_access >
+        (chunk.timestamp_end - chunk.timestamp_start) / 2) {
+      bool* has_late = (bool*) arg;
+      *has_late = true;
+    }
+  }, &has_late_free);
+
+  if (has_early_alloc) {
+    handle.add_inefficiency(Inefficiency::EarlyAlloc);
+  }
+  if (has_late_free) {
+    handle.add_inefficiency(Inefficiency::LateFree);
   }
 }
 
@@ -116,11 +200,17 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
     if (handle.has_inefficiency(Inefficiency::Unused))
       Printf("--> Produces totally unused chunks (but may be from un-instrumented code)\n");
     if (handle.has_inefficiency(Inefficiency::ReadOnly))
-      Printf("--> Produces read-only chunks:\n");
+      Printf("--> Produces read-only chunks\n");
     if (handle.has_inefficiency(Inefficiency::WriteOnly))
-      Printf("--> Produces write-only chunks:\n");
+      Printf("--> Produces write-only chunks\n");
     if (handle.has_inefficiency(Inefficiency::ShortLifetime))
       Printf("--> Allocates chunks with very short lifetimes ( < %lld ms )\n", BAD_LIFETIME_MIN/1000000);
+    if (handle.has_inefficiency(Inefficiency::EarlyAlloc))
+      Printf("--> Allocates chunks early (first access after half of lifetime)\n");
+    if (handle.has_inefficiency(Inefficiency::LateFree))
+      Printf("--> Free chunks late (last access less than half of lifetime)\n");
+    if (handle.has_inefficiency(Inefficiency::IncreasingReallocs))
+      Printf("--> Has increasing allocation size patterns (did you put an alloc in a loop?)\n");
 
     // TODO if some verbose level output the individual chunks
     handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
@@ -175,8 +265,14 @@ void __hplgst_exit(void *Ptr) {
   u64 end_ts = get_timestamp();
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
+  // run all the different analyses across the different allocation
+  // point stack traces
+  // TODO add args to enable / disable individual analyses
+  HplgstStackDepot_SortAllChunkVectors();
   HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
   HplgstStackDepot_ForEachStackTrace(FindShortLifetimeAllocs, nullptr);
+  HplgstStackDepot_ForEachStackTrace(FindEarlyAllocLateFreeCb, nullptr);
+  HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);
   HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
 
   UnlockAllocator();

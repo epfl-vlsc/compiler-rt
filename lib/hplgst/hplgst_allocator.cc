@@ -54,7 +54,8 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   m->num_reads = 0;
   m->num_writes = 0;
   m->timestamp = get_timestamp();
-  m->latest_timestamp = m->timestamp;
+  m->latest_timestamp = 0;  // access timestamps
+  m->first_timestamp = 0;
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
   //Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
@@ -79,13 +80,8 @@ static void RegisterDeallocation(void *p) {
   chunk.size = m->requested_size;
   chunk.num_writes = m->num_writes;
   chunk.num_reads = m->num_reads;
-  /*if (m->num_reads != 0) {
-    Printf("this chunk had %d reads ", m->num_reads);
-  }
-  if (m->num_writes != 0) {
-    Printf("this chunk had %d writes\n", m->num_writes);
-  }
-  Printf("this chunk lived for %lld ns\n", diff_ns);*/
+  chunk.timestamp_last_access = m->latest_timestamp;
+  chunk.timestamp_first_access = m->first_timestamp;
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
@@ -215,6 +211,10 @@ void HplgstMetadata::set_latest_timestamp(u64 ts) {
   reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp = ts;
 }
 
+void HplgstMetadata::set_first_timestamp(u64 ts) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp = ts;
+}
+
 u8 HplgstMetadata::num_reads() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
 }
@@ -235,7 +235,15 @@ void HplgstMetadata::incr_writes() {
     chunkmeta->num_writes++;
 }
 
-void ForEachChunk(ForEachChunkCallback callback, void *arg) {
+u64 HplgstMetadata::first_timestamp() {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp;
+}
+
+u64 HplgstMetadata::latest_timestamp() {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp;
+}
+
+  void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }
 

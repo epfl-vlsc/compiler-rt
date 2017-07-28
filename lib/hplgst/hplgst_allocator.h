@@ -57,6 +57,7 @@ struct ChunkMetadata {
   u32 stack_trace_id : 32;
   u64 timestamp;
   u64 latest_timestamp;
+  u64 first_timestamp;
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64

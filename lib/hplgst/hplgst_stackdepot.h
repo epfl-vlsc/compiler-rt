@@ -25,24 +25,30 @@ struct HplgstMemoryChunk {
                     u64 sz, u64 ts_start, u64 ts_end) : num_reads(n_reads), num_writes(n_writes),
                                       allocated(allocd), size(sz),
                                       timestamp_start(ts_start), timestamp_end(ts_end) {}
-  HplgstMemoryChunk() : num_reads(0), num_writes(0), allocated(0), size(0),
-                        timestamp_start(0), timestamp_end(0) {}
-  u8 num_reads;
-  u8 num_writes;
-  u8 allocated;
+  HplgstMemoryChunk() {}
+  u8 num_reads = 0;
+  u8 num_writes = 0;
+  u8 allocated = 0;
   u8 pad;
-  u64 size;
-  u64 timestamp_start;
-  u64 timestamp_end;
+  u64 size = 0;
+  u64 timestamp_start = 0;
+  u64 timestamp_end = 0;
+  u64 timestamp_first_access = 0;
+  u64 timestamp_last_access = 0;
+  static bool ChunkComparator(const HplgstMemoryChunk &a, const HplgstMemoryChunk &b);
 };
+
 
 typedef void (*ForEachMemChunkCb) (HplgstMemoryChunk& chunk, void* arg);
 
 enum Inefficiency : u64 {
   Unused = 0x1,
-  WriteOnly = 0x2,
-  ReadOnly = 0x4,
-  ShortLifetime = 0x8
+  WriteOnly = 1 << 1,
+  ReadOnly = 1 << 2,
+  ShortLifetime = 1 << 3,
+  LateFree = 1 << 4,
+  EarlyAlloc =  1 << 5,
+  IncreasingReallocs = 1 << 6
 };
 
 // StackDepot efficiently stores huge amounts of stack traces.
@@ -73,6 +79,7 @@ StackDepotStats *StackDepotGetStats();
 HplgstStackDepotHandle HplgstStackDepotPut_WithHandle(StackTrace stack);
 HplgstStackDepotHandle HplgstStackDepotGetHandle(u32 id);
 void HplgstStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg);
+void HplgstStackDepot_SortAllChunkVectors();
 
 // Retrieves a stored stack trace by the id.
 //StackAndChunks StackDepotGet(u32 id);

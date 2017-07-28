@@ -127,7 +127,7 @@ uptr HplgstStackDepotHandle::total_chunks() {
 
 void HplgstStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
   auto vec = node_->chunk_vec;
-  for (auto i = 0; i < vec->size(); i++) {
+  for (uptr i = 0; i < vec->size(); i++) {
     func((*vec)[i], arg);
   }
 }
@@ -190,5 +190,18 @@ void HplgstStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg) {
   theDepot.ForEach(func, arg);
 }
 
+
+bool HplgstMemoryChunk::ChunkComparator(const HplgstMemoryChunk& a, const HplgstMemoryChunk& b) {
+  return a.timestamp_start < b.timestamp_start;
+}
+
+void SortCb(HplgstStackDepotHandle& handle, void* arg) {
+  InternalSort(handle.node_->chunk_vec, handle.node_->chunk_vec->size(),
+  HplgstMemoryChunk::ChunkComparator);
+}
+
+void HplgstStackDepot_SortAllChunkVectors() {
+  HplgstStackDepot_ForEachStackTrace(SortCb, nullptr);
+}
 
 } // namespace __hplgst
