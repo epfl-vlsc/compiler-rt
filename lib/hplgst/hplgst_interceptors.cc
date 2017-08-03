@@ -546,7 +546,6 @@ INTERCEPTOR(char*, strcpy, char *to, const char *from) {  // NOLINT
   }
   ENSURE_HPLGST_INITED();
   if (getFlags()->replace_str) {
-    Printf("calling strcpy!!!!\n");
     uptr from_size = REAL(strlen)(from) + 1;
     CHECK_RANGES_OVERLAP("strcpy", to, from_size, from, from_size);
     HPLGST_READ_RANGE(ctx, from, from_size);

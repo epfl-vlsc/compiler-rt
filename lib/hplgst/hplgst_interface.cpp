@@ -259,6 +259,15 @@ void __hplgst_exit(void *Ptr) {
   LockThreadRegistry();
   LockAllocator();
 
+  // TODO should probably use atexit or something for this
+  static bool done = false;
+  if (done) {
+    UnlockAllocator();
+    UnlockThreadRegistry();
+    return;
+  }
+  done = true;
+
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
   u64 end_ts = get_timestamp();
