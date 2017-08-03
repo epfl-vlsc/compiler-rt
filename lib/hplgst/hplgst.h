@@ -38,7 +38,7 @@
   GET_STACK_TRACE(kStackTraceMax, common_flags()->fast_unwind_on_fatal)
 
 #define GET_STACK_TRACE_MALLOC                                      \
-  GET_STACK_TRACE(__sanitizer::common_flags()->malloc_context_size, \
+  GET_STACK_TRACE(common_flags()->malloc_context_size, \
                   common_flags()->fast_unwind_on_malloc)
 
 namespace __hplgst {
@@ -47,7 +47,7 @@ void InitializeInterceptors();
 
 void ReplaceSystemMalloc();
 
-void processRangeAccess(__sanitizer::uptr PC, __sanitizer::uptr Addr, uptr Size, bool IsWrite);
+void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
 
 #define ENSURE_HPLGST_INITED() do {   \
   CHECK(!hplgst_init_is_running);   \

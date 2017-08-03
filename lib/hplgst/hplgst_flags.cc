@@ -46,6 +46,7 @@ namespace __hplgst {
       CommonFlags cf;
       cf.CopyFrom(*common_flags());
       cf.external_symbolizer_path = GetEnv("HPLGST_SYMBOLIZER_PATH");
+      // we need large context for mallocs to get unique allocation points
       cf.malloc_context_size = 30;
       cf.intercept_tls_get_addr = true;
       cf.exitcode = 23;

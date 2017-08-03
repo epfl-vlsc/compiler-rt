@@ -48,9 +48,6 @@ void AddStillAllocatedCb(uptr chunk, void *arg) {
   }
 }
 
-// TODO make editable from cmd line
-#define REALLOC_INCREASE_RUN_MIN 3
-
 struct FindReallocsMeta {
   u64 last_size = 0;
   u32 current_run = 0;
@@ -89,7 +86,7 @@ void FindBadReallocsCb(HplgstStackDepotHandle& handle, void* arg) {
     }
   }, &meta);
 
-  if (meta.longest_run >= REALLOC_INCREASE_RUN_MIN) {
+  if (meta.longest_run >= getFlags()->realloc_min_run) {
     handle.add_inefficiency(Inefficiency::IncreasingReallocs);
   }
 }
@@ -163,9 +160,6 @@ void FindUnusedAllocsCb(HplgstStackDepotHandle& handle, void* arg) {
 
 }
 
-// TODO could make this relative to actual program lifetime?
-#define BAD_LIFETIME_MIN 1000000  // 1 millisecond
-
 // a ForEachStackTrace callback
 void FindShortLifetimeAllocs(HplgstStackDepotHandle& handle, void* arg) {
 
@@ -186,7 +180,7 @@ void FindShortLifetimeAllocs(HplgstStackDepotHandle& handle, void* arg) {
       *cur_min = lifetime;
   }, &min_lifetime);
 
-  if (min_lifetime < BAD_LIFETIME_MIN) {
+  if (min_lifetime < getFlags()->short_lifetime) {
     handle.add_inefficiency(Inefficiency::ShortLifetime);
   }
 
@@ -195,30 +189,35 @@ void FindShortLifetimeAllocs(HplgstStackDepotHandle& handle, void* arg) {
 // a ForEachStackTrace callback
 void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
   if (handle.has_inefficiencies()) {
-    Printf("---------- Allocation Point: ----------\n");
-    handle.trace().Print();
-    if (handle.has_inefficiency(Inefficiency::Unused))
-      Printf("--> Produces totally unused chunks (but may be from un-instrumented code)\n");
-    if (handle.has_inefficiency(Inefficiency::ReadOnly))
-      Printf("--> Produces read-only chunks\n");
-    if (handle.has_inefficiency(Inefficiency::WriteOnly))
-      Printf("--> Produces write-only chunks\n");
-    if (handle.has_inefficiency(Inefficiency::ShortLifetime))
-      Printf("--> Allocates chunks with very short lifetimes ( < %lld ms )\n", BAD_LIFETIME_MIN/1000000);
-    if (handle.has_inefficiency(Inefficiency::EarlyAlloc))
-      Printf("--> Allocates chunks early (first access after half of lifetime)\n");
-    if (handle.has_inefficiency(Inefficiency::LateFree))
-      Printf("--> Free chunks late (last access less than half of lifetime)\n");
-    if (handle.has_inefficiency(Inefficiency::IncreasingReallocs))
-      Printf("--> Has increasing allocation size patterns (did you put an alloc in a loop?)\n");
+    if (!handle.has_inefficiency(Inefficiency::Unused)) {
+      Printf("---------- Allocation Point: ----------\n");
+      handle.trace().Print();
+      if (handle.has_inefficiency(Inefficiency::Unused))
+        Printf("--> Produces totally unused chunks (but may be from un-instrumented code)\n");
+      if (handle.has_inefficiency(Inefficiency::ReadOnly))
+        Printf("--> Produces read-only chunks\n");
+      if (handle.has_inefficiency(Inefficiency::WriteOnly))
+        Printf("--> Produces write-only chunks\n");
+      if (handle.has_inefficiency(Inefficiency::ShortLifetime))
+        Printf("--> Allocates chunks with very short lifetimes ( < %lld ms )\n", getFlags()->short_lifetime / 1000000);
+      if (!handle.has_inefficiency(Inefficiency::ShortLifetime)) {
+        // these really only make sense if chunks don't have short lifetimes
+        if (handle.has_inefficiency(Inefficiency::EarlyAlloc))
+          Printf("--> Allocates chunks early (first access after half of lifetime)\n");
+        if (handle.has_inefficiency(Inefficiency::LateFree))
+          Printf("--> Free chunks late (last access less than half of lifetime)\n");
+      }
+      if (handle.has_inefficiency(Inefficiency::IncreasingReallocs))
+        Printf("--> Has increasing allocation size patterns (did you put an alloc in a loop?)\n");
 
-    // TODO if some verbose level output the individual chunks
-    handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
-      Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
-             chunk.size, chunk.num_reads, chunk.num_writes,
-             timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
-    }, arg);
-    Printf("---------------------------------------\n");
+      // TODO if some verbose level output the individual chunks
+      handle.ForEachChunk([](HplgstMemoryChunk &chunk, void *arg) {
+        Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
+               chunk.size, chunk.num_reads, chunk.num_writes,
+               timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
+      }, arg);
+      Printf("---------------------------------------\n");
+    }
 
   }
 }

@@ -23,6 +23,7 @@
 namespace __hplgst {
 
 static ThreadRegistry *thread_registry;
+static bool initialized;
 
 static ThreadContextBase *CreateThreadContext(u32 tid) {
   void *mem = MmapOrDie(sizeof(ThreadContext), "ThreadContext");
@@ -36,6 +37,10 @@ void InitializeThreadRegistry() {
   static ALIGNED(64) char thread_registry_placeholder[sizeof(ThreadRegistry)];
   thread_registry = new(thread_registry_placeholder)
     ThreadRegistry(CreateThreadContext, kMaxThreads, kThreadQuarantineSize);
+}
+
+ThreadRegistry &hplgstThreadRegistry() {
+  return *thread_registry;
 }
 
 ThreadContext::ThreadContext(u32 tid)

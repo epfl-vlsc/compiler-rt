@@ -21,19 +21,14 @@
 // HPLGST_FLAG(Type, Name, DefaultValue, Description)
 // See COMMON_FLAG in sanitizer_flags.inc for more details.
 
+
+HPLGST_FLAG(int, short_lifetime, 1000000, "Short lifetime detection threshold in nanoseconds [1M ns]")
+HPLGST_FLAG(int, realloc_min_run, 4, "Minimum number of increasing allocation size to flag [4]")
 HPLGST_FLAG(
-    int, resolution, 0,
-    "Aggregate two objects into one leak if this many stack frames match. If "
-    "zero, the entire stack trace must match.")
-
-// Flags controlling the root set of reachable memory.
-HPLGST_FLAG(bool, use_globals, true,
-          "Root set: include global variables (.data and .bss)")
-HPLGST_FLAG(bool, use_stacks, true, "Root set: include thread stacks")
-HPLGST_FLAG(bool, use_registers, true, "Root set: include thread registers")
-HPLGST_FLAG(bool, use_tls, true,
-          "Root set: include TLS and thread-specific storage")
-HPLGST_FLAG(bool, use_root_regions, true,
-          "Root set: include regions added via __hplgst_register_root_region().")
-
-HPLGST_FLAG(const char *, suppressions, "", "Suppressions file name.")
+        bool, replace_str, true,
+"If set, uses custom wrappers and replacements for libc string functions "
+"to find more errors.")
+HPLGST_FLAG(bool, replace_intrin, true,
+"If set, uses custom wrappers for memset/memcpy/memmove intrinsics.")
+// we may want to keep the suppressions file
+//HPLGST_FLAG(const char *, suppressions, "", "Suppressions file name.")

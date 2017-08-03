@@ -25,6 +25,7 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   /*VPrintf(3, "in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
           IsWrite ? 'w' : 'r', Addr, Size);*/
 
+  // TODO do we need Size or PC?
   void *p = (void*)Addr;
   if (PointerIsAllocator(p) ) {
     HplgstMetadata m(Addr);

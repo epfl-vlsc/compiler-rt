@@ -47,6 +47,8 @@ class ThreadContext : public ThreadContextBase {
 };
 
 void InitializeThreadRegistry();
+// Returns a single instance of registry.
+ThreadRegistry &hplgstThreadRegistry();
 
 void ThreadStart(u32 tid, uptr os_id);
 void ThreadFinish();
