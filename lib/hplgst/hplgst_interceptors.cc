@@ -565,6 +565,7 @@ INTERCEPTOR(char*, strdup, const char *s) {
   }
   GET_STACK_TRACE_MALLOC;
   void *new_mem = hplgst_malloc(length + 1, stack);
+  HPLGST_WRITE_RANGE(ctx, new_mem, length + 1);
   REAL(memcpy)(new_mem, s, length + 1);
   return reinterpret_cast<char*>(new_mem);
 }

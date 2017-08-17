@@ -210,16 +210,57 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
       if (handle.has_inefficiency(Inefficiency::IncreasingReallocs))
         Printf("--> Has increasing allocation size patterns (did you put an alloc in a loop?)\n");
 
-      // TODO if some verbose level output the individual chunks
-      handle.ForEachChunk([](HplgstMemoryChunk &chunk, void *arg) {
-        Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
-               chunk.size, chunk.num_reads, chunk.num_writes,
-               timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
-      }, arg);
+      if (getFlags()->verbose_chunks) {
+        handle.ForEachChunk([](HplgstMemoryChunk &chunk, void *arg) {
+          Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
+                 chunk.size, chunk.num_reads, chunk.num_writes,
+                 timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
+        }, arg);
+
+      } else {
+        int count = 0;
+        handle.ForEachChunk([](HplgstMemoryChunk &chunk, void *arg) {
+          int * c = (int*) arg;
+          (*c)++;
+        }, &count);
+        Printf("%d chunks allocated at this point\n", count);
+
+      }
       Printf("---------------------------------------\n");
     }
 
   }
+}
+
+static void OnExit () {
+
+  LockThreadRegistry();
+  LockAllocator();
+
+  // add remaining still-allocated chunks to the stack depot
+  // structure, use program end as the end timestamp
+  Printf("Heapologist pre-processing still allocated chunks ...\n");
+  u64 end_ts = get_timestamp();
+  ForEachChunk(AddStillAllocatedCb, &end_ts);
+
+  // run all the different analyses across the different allocation
+  // point stack traces
+  // TODO add args to enable / disable individual analyses
+  Printf("Heapologist sorting chunks ...\n");
+  HplgstStackDepot_SortAllChunkVectors();
+  Printf("Heapologist processing ...\n");
+  HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
+  Printf("Heapologist processing short lt ...\n");
+  HplgstStackDepot_ForEachStackTrace(FindShortLifetimeAllocs, nullptr);
+  Printf("Heapologist processing early allocs ...\n");
+  HplgstStackDepot_ForEachStackTrace(FindEarlyAllocLateFreeCb, nullptr);
+  Printf("Heapologist processing bad realloc ...\n");
+  HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);
+  HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
+
+  UnlockAllocator();
+  UnlockThreadRegistry();
+
 }
 
 
@@ -242,6 +283,7 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   CHECK_EQ(tid, 0);
   ThreadStart(tid, GetTid());
   SetCurrentThread(tid);
+  Atexit(OnExit);
 
   //InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
 
@@ -256,35 +298,6 @@ void __sanitizer_print_stack_trace() {
 }
 
 void __hplgst_exit(void *Ptr) {
-  LockThreadRegistry();
-  LockAllocator();
-
-  // TODO should probably use atexit or something for this
-  static bool done = false;
-  if (done) {
-    UnlockAllocator();
-    UnlockThreadRegistry();
-    return;
-  }
-  done = true;
-
-  // add remaining still-allocated chunks to the stack depot
-  // structure, use program end as the end timestamp
-  u64 end_ts = get_timestamp();
-  ForEachChunk(AddStillAllocatedCb, &end_ts);
-
-  // run all the different analyses across the different allocation
-  // point stack traces
-  // TODO add args to enable / disable individual analyses
-  HplgstStackDepot_SortAllChunkVectors();
-  HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
-  HplgstStackDepot_ForEachStackTrace(FindShortLifetimeAllocs, nullptr);
-  HplgstStackDepot_ForEachStackTrace(FindEarlyAllocLateFreeCb, nullptr);
-  HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);
-  HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
-
-  UnlockAllocator();
-  UnlockThreadRegistry();
 }
 
 void __hplgst_aligned_load1(void *Addr) {

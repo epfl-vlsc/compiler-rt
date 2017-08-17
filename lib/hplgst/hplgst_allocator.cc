@@ -40,7 +40,8 @@ void AllocatorThreadFinish() {
 }
 
 static ChunkMetadata *Metadata(const void *p) {
-  return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p));
+  void * p_begin = allocator.GetBlockBegin(p);
+  return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p_begin));
 }
 
 static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {

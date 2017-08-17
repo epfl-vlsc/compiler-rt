@@ -127,6 +127,7 @@ uptr HplgstStackDepotHandle::total_chunks() {
 
 void HplgstStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
   auto vec = node_->chunk_vec;
+  //Printf("handle has %d chunks\n", vec->size());
   for (uptr i = 0; i < vec->size(); i++) {
     func((*vec)[i], arg);
   }

@@ -30,5 +30,7 @@ HPLGST_FLAG(
 "to find more errors.")
 HPLGST_FLAG(bool, replace_intrin, true,
 "If set, uses custom wrappers for memset/memcpy/memmove intrinsics.")
+HPLGST_FLAG(bool, verbose_chunks, false,
+"If set, output all recorded chunks at each allocation point.")
 // we may want to keep the suppressions file
 //HPLGST_FLAG(const char *, suppressions, "", "Suppressions file name.")
