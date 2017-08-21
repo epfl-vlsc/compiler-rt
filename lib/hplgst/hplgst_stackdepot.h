@@ -48,7 +48,8 @@ enum Inefficiency : u64 {
   ShortLifetime = 1 << 3,
   LateFree = 1 << 4,
   EarlyAlloc =  1 << 5,
-  IncreasingReallocs = 1 << 6
+  IncreasingReallocs = 1 << 6,
+  TopPercentile = 1 << 7
 };
 
 // StackDepot efficiently stores huge amounts of stack traces.
@@ -65,10 +66,12 @@ struct HplgstStackDepotHandle {
   HplgstMemoryChunk& new_chunk();
   void ForEachChunk(ForEachMemChunkCb func, void* arg);
   bool TraceHasMain();
-  uptr total_chunks();
+  uptr total_chunks() const;
   void add_inefficiency(Inefficiency i);
   bool has_inefficiency(Inefficiency i);
   bool has_inefficiencies();
+  static bool ChunkNumComparator(const HplgstStackDepotHandle &a,
+                                 const HplgstStackDepotHandle &b);
 };
 
 

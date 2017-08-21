@@ -187,6 +187,23 @@ void FindShortLifetimeAllocs(HplgstStackDepotHandle& handle, void* arg) {
 }
 
 // a ForEachStackTrace callback
+void TallyAllocationPoint(HplgstStackDepotHandle& handle, void* arg) {
+
+  // Currently flags an allocation point that produces *any* short
+  // lived chunks
+
+  // don't include stack traces that don't originate from main()
+  // TODO do this once and filter them up front
+  if (!handle.TraceHasMain()) {
+    return;
+  }
+
+  auto vec = (InternalMmapVector<HplgstStackDepotHandle>*) arg;
+  vec->push_back(handle);
+
+}
+
+// a ForEachStackTrace callback
 void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
   if (handle.has_inefficiencies()) {
     if (!handle.has_inefficiency(Inefficiency::Unused)) {
@@ -195,7 +212,7 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
       if (handle.has_inefficiency(Inefficiency::Unused))
         Printf("--> Produces totally unused chunks (but may be from un-instrumented code)\n");
       if (handle.has_inefficiency(Inefficiency::ReadOnly))
-        Printf("--> Produces read-only chunks\n");
+        Printf("--> Produces read-only chunks (may be from un-instrumented code)\n");
       if (handle.has_inefficiency(Inefficiency::WriteOnly))
         Printf("--> Produces write-only chunks\n");
       if (handle.has_inefficiency(Inefficiency::ShortLifetime))
@@ -209,6 +226,8 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
       }
       if (handle.has_inefficiency(Inefficiency::IncreasingReallocs))
         Printf("--> Has increasing allocation size patterns (did you put an alloc in a loop?)\n");
+      if (handle.has_inefficiency(Inefficiency::TopPercentile))
+        Printf("--> Is in the top %d-th percentile of chunks allocated\n", getFlags()->percentile);
 
       if (getFlags()->verbose_chunks) {
         handle.ForEachChunk([](HplgstMemoryChunk &chunk, void *arg) {
@@ -256,6 +275,16 @@ static void OnExit () {
   HplgstStackDepot_ForEachStackTrace(FindEarlyAllocLateFreeCb, nullptr);
   Printf("Heapologist processing bad realloc ...\n");
   HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);
+
+  InternalMmapVector<HplgstStackDepotHandle> all_alloc_points(128);
+  HplgstStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
+  InternalSort(&all_alloc_points, all_alloc_points.size(), HplgstStackDepotHandle::ChunkNumComparator);
+  float percentile = (float) getFlags()->percentile / 100.0f;
+  int index = int(percentile * all_alloc_points.size());
+  for (int i = index; i < all_alloc_points.size(); i++) {
+    all_alloc_points[i].add_inefficiency(Inefficiency::TopPercentile);
+  }
+
   HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
 
   UnlockAllocator();

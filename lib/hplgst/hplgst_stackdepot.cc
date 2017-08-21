@@ -121,7 +121,7 @@ HplgstMemoryChunk& HplgstStackDepotHandle::new_chunk() {
   return vec->back();
 }
 
-uptr HplgstStackDepotHandle::total_chunks() {
+uptr HplgstStackDepotHandle::total_chunks() const {
   return node_->chunk_vec->size();
 }
 
@@ -159,6 +159,10 @@ bool HplgstStackDepotHandle::TraceHasMain() {
 
   bool HplgstStackDepotHandle::has_inefficiencies() {
     return node_->inefficiencies != 0;
+  }
+
+  bool HplgstStackDepotHandle::ChunkNumComparator(const HplgstStackDepotHandle &a, const HplgstStackDepotHandle &b) {
+    return a.total_chunks() < b.total_chunks();
   }
 
 

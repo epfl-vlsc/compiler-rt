@@ -32,5 +32,7 @@ HPLGST_FLAG(bool, replace_intrin, true,
 "If set, uses custom wrappers for memset/memcpy/memmove intrinsics.")
 HPLGST_FLAG(bool, verbose_chunks, false,
 "If set, output all recorded chunks at each allocation point.")
+HPLGST_FLAG(int, percentile, 90,
+"Percentile of high-chunk allocation points to report [90]")
 // we may want to keep the suppressions file
 //HPLGST_FLAG(const char *, suppressions, "", "Suppressions file name.")
