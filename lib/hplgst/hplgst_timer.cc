@@ -18,7 +18,7 @@
 
 
 #if SANITIZER_LINUX
-#include time.h
+#include "time.h"
 #elif SANITIZER_MAC
 #include <mach/mach_time.h>
 #endif

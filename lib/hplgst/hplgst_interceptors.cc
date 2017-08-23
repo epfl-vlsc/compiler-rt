@@ -577,11 +577,11 @@ INTERCEPTOR(char*, __strdup, const char *s) {
   if (UNLIKELY(!hplgst_inited)) return internal_strdup(s);
   ENSURE_HPLGST_INITED();
   uptr length = REAL(strlen)(s);
-  if (flags()->replace_str) {
+  if (getFlags()->replace_str) {
     HPLGST_READ_RANGE(ctx, s, length + 1);
   }
   GET_STACK_TRACE_MALLOC;
-  void *new_mem = hplgst_malloc(length + 1, &stack);
+  void *new_mem = hplgst_malloc(length + 1, stack);
   REAL(memcpy)(new_mem, s, length + 1);
   return reinterpret_cast<char*>(new_mem);
 }

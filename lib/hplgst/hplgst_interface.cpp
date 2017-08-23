@@ -33,6 +33,7 @@ void AddStillAllocatedCb(uptr chunk, void *arg) {
   chunk = GetUserBegin(chunk);
   HplgstMetadata m(chunk); // in the end calls allocator.getMetadata(chunk)
   // at the end, we only care about chunks that are still allocated
+  //Printf("lifetime: %lld \n", m.latest_timestamp() - m.timestamp_start());
   if (m.allocated()) {
     //Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
     HplgstStackDepotHandle handle = HplgstStackDepotGetHandle(m.stack_trace_id());
@@ -64,9 +65,9 @@ void FindBadReallocsCb(HplgstStackDepotHandle& handle, void* arg) {
   // in a loop
 
   // don't include stack traces that don't originate from main()
-  if (!handle.TraceHasMain()) {
+  /*if (!handle.TraceHasMain()) {
     return;
-  }
+  }*/
 
   FindReallocsMeta meta;
   handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
@@ -97,9 +98,9 @@ void FindEarlyAllocLateFreeCb(HplgstStackDepotHandle& handle, void* arg) {
   // of the chunk
 
   // don't include stack traces that don't originate from main()
-  if (!handle.TraceHasMain()) {
+  /*if (!handle.TraceHasMain()) {
     return;
-  }
+  }*/
 
   bool has_early_alloc = false;
   handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
@@ -134,9 +135,9 @@ void FindUnusedAllocsCb(HplgstStackDepotHandle& handle, void* arg) {
   // we try to find points that produce basically unused allocs
 
   // don't include stack traces that don't originate from main()
-  if (!handle.TraceHasMain()) {
+  /*if (!handle.TraceHasMain()) {
     return;
-  }
+  }*/
 
   int total_reads = 0, total_writes = 0;
   handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
@@ -165,12 +166,13 @@ void FindShortLifetimeAllocs(HplgstStackDepotHandle& handle, void* arg) {
 
   // Currently flags an allocation point that produces *any* short
   // lived chunks
-
+  //handle.trace().Print();
   // don't include stack traces that don't originate from main()
   // TODO do this once and filter them up front
-  if (!handle.TraceHasMain()) {
+  /*if (!handle.TraceHasMain()) {
+    Printf("no main\n");
     return;
-  }
+  }*/
 
   u64 min_lifetime = UINT64_MAX;
   handle.ForEachChunk([](HplgstMemoryChunk& chunk, void* arg){
@@ -194,9 +196,9 @@ void TallyAllocationPoint(HplgstStackDepotHandle& handle, void* arg) {
 
   // don't include stack traces that don't originate from main()
   // TODO do this once and filter them up front
-  if (!handle.TraceHasMain()) {
+  /*if (!handle.TraceHasMain()) {
     return;
-  }
+  }*/
 
   auto vec = (InternalMmapVector<HplgstStackDepotHandle>*) arg;
   vec->push_back(handle);
@@ -253,8 +255,8 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
 
 static void OnExit () {
 
-  LockThreadRegistry();
-  LockAllocator();
+  //LockThreadRegistry();
+  //LockAllocator();
 
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
@@ -287,8 +289,8 @@ static void OnExit () {
 
   HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
 
-  UnlockAllocator();
-  UnlockThreadRegistry();
+  //UnlockAllocator();
+  //UnlockThreadRegistry();
 
 }
 
