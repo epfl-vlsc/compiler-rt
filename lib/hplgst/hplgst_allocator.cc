@@ -48,6 +48,7 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   if (!p) return;
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
+  // TODO tag with thread id?
   m->requested_size = size; // This must always be present, or hplgst_mz_size fails (and
                             // so does malloc_zone_from_ptr on Mac).
   HplgstStackDepotHandle handle = HplgstStackDepotPut_WithHandle(stack) ;

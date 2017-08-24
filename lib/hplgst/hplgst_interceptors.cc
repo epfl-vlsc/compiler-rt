@@ -491,6 +491,29 @@ static inline uptr MaybeRealStrnlen(const char *s, uptr maxlen) {
 #endif
   return internal_strnlen(s, maxlen);
 }
+
+
+INTERCEPTOR(uptr, fread, void *ptr, uptr size, uptr nmemb, void *f) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, fread, ptr, size, nmemb, f);
+  COMMON_INTERCEPTOR_WRITE_RANGE(ctx, ptr, size * nmemb);
+  return REAL(fread)(ptr, size, nmemb, f);
+}
+
+INTERCEPTOR(uptr, fwrite, const void *p, uptr size, uptr nmemb, void *f) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, fwrite, p, size, nmemb, f);
+  COMMON_INTERCEPTOR_READ_RANGE(ctx, p, size * nmemb);
+  return REAL(fwrite)(p, size, nmemb, f);
+}
+
+INTERCEPTOR(int, puts, const char *s) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, puts, s);
+  COMMON_INTERCEPTOR_READ_RANGE(ctx, s, internal_strlen(s));
+  return REAL(puts)(s);
+}
+
 // For both strcat() and strncat() we need to check the validity of |to|
 // argument irrespective of the |from| length.
 INTERCEPTOR(char*, strcat, char *to, const char *from) {  // NOLINT

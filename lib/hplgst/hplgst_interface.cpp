@@ -205,6 +205,8 @@ void TallyAllocationPoint(HplgstStackDepotHandle& handle, void* arg) {
 
 }
 
+static u64 hplgst_start;
+
 // a ForEachStackTrace callback
 void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
   if (handle.has_inefficiencies()) {
@@ -255,9 +257,6 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
 
 static void OnExit () {
 
-  //LockThreadRegistry();
-  //LockAllocator();
-
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
   Printf("Heapologist pre-processing still allocated chunks ...\n");
@@ -269,6 +268,7 @@ static void OnExit () {
   // TODO add args to enable / disable individual analyses
   Printf("Heapologist sorting chunks ...\n");
   HplgstStackDepot_SortAllChunkVectors();
+
   Printf("Heapologist processing ...\n");
   HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
   Printf("Heapologist processing short lt ...\n");
@@ -278,8 +278,12 @@ static void OnExit () {
   Printf("Heapologist processing bad realloc ...\n");
   HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);
 
+  // making a copy of stack trace handles, pointed-to data
+  // is not duplicated
   InternalMmapVector<HplgstStackDepotHandle> all_alloc_points(128);
   HplgstStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
+  Printf("Program has %d active allocation points this run\n", all_alloc_points.size());
+  // sort to calculate percentile
   InternalSort(&all_alloc_points, all_alloc_points.size(), HplgstStackDepotHandle::ChunkNumComparator);
   float percentile = (float) getFlags()->percentile / 100.0f;
   int index = int(percentile * all_alloc_points.size());
@@ -287,10 +291,49 @@ static void OnExit () {
     all_alloc_points[i].add_inefficiency(Inefficiency::TopPercentile);
   }
 
-  HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
+  // write all alloc points and chunks to file
+  // this could be pretty big ...
 
-  //UnlockAllocator();
-  //UnlockThreadRegistry();
+  fd_t hplgst_outfile = OpenFile("hplgst.json", FileAccessMode::WrOnly);
+  const uptr buflen = 1024*1024;
+  char buf[buflen];  // 1MB because i dont care
+  uptr bytes_written;
+
+  const char * begin_str = "[\n";
+  const char * trace_str = "{\n\"trace\":\"";
+  const char * chunks_str = "\",\n\"chunks\": [\n";
+  const char * end_chunks_str = "{}\n]\n},\n";
+  const char * end_str = "{}\n]\n";
+
+  WriteToFile(hplgst_outfile, begin_str, internal_strlen(begin_str), &bytes_written);
+  for (auto& alloc_point : all_alloc_points) {
+    WriteToFile(hplgst_outfile, trace_str, internal_strlen(trace_str), &bytes_written);
+    alloc_point.trace().SPrint(buf, buflen, "#%n %p %F %L|");
+
+    WriteToFile(hplgst_outfile, buf, internal_strlen(buf), &bytes_written);
+    WriteToFile(hplgst_outfile, chunks_str, internal_strlen(chunks_str), &bytes_written);
+
+    alloc_point.ForEachChunk([](HplgstMemoryChunk& chunk, void * arg){
+      char buf[2048];
+      // reads writes allocated size ts_start ts_end ts_first ts_last
+      internal_snprintf(buf, 2048, "{\"reads\":%d, \"writes\":%d, \"allocated\":%d, \"size\":%lld, \"ts_start\":%lld, \"ts_end\":%lld, \"ts_first\":%lld, \"ts_last\":%lld},\n", chunk.num_reads, chunk.num_writes,
+                        chunk.allocated, chunk.size, chunk.timestamp_start - hplgst_start, chunk.timestamp_end - hplgst_start,
+                        chunk.timestamp_first_access - hplgst_start,
+                        chunk.timestamp_last_access - hplgst_start);
+      fd_t outfile = *(fd_t*)arg;
+      uptr bytes_written;
+      WriteToFile(outfile, buf, internal_strlen(buf), &bytes_written);
+
+    }, &hplgst_outfile);
+
+    WriteToFile(hplgst_outfile, end_chunks_str, internal_strlen(end_chunks_str), &bytes_written);
+
+  }
+  WriteToFile(hplgst_outfile, end_str, internal_strlen(end_str), &bytes_written);
+
+  CloseFile(hplgst_outfile);
+
+  //HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
 
 }
 
@@ -315,6 +358,7 @@ extern "C" void __hplgst_init(ToolType Tool, void *Ptr) {
   ThreadStart(tid, GetTid());
   SetCurrentThread(tid);
   Atexit(OnExit);
+  hplgst_start = get_timestamp();
 
   //InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
 
