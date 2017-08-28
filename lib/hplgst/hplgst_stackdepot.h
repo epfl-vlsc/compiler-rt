@@ -66,6 +66,7 @@ struct HplgstStackDepotHandle {
   HplgstMemoryChunk& new_chunk();
   void ForEachChunk(ForEachMemChunkCb func, void* arg);
   bool TraceHasMain();
+  bool TraceHasUnknown();
   uptr total_chunks() const;
   void add_inefficiency(Inefficiency i);
   bool has_inefficiency(Inefficiency i);

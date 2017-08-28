@@ -140,9 +140,26 @@ bool HplgstStackDepotHandle::TraceHasMain() {
     SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
     CHECK(frames);
     for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
-      if (cur->info.function && internal_strstr(cur->info.function, "main") != nullptr){
+      /*if (cur->info.function && internal_strstr(cur->info.function, "unknown module") != nullptr){
         return true;
-      }
+      }*/
+      if (!cur->info.module)
+        return true;
+    }
+    frames->ClearAll();
+  }
+  return false;
+}
+
+bool HplgstStackDepotHandle::TraceHasUnknown() {
+
+  for (uptr i = 0; i < node_->size && node_->stack[i]; i++) {
+    uptr pc = StackTrace::GetPreviousInstructionPc(node_->stack[i]);
+    SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
+    CHECK(frames);
+    for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
+      if (!cur->info.module)
+        return true;
     }
     frames->ClearAll();
   }

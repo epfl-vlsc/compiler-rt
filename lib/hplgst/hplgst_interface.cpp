@@ -196,7 +196,7 @@ void TallyAllocationPoint(HplgstStackDepotHandle& handle, void* arg) {
 
   // don't include stack traces that don't originate from main()
   // TODO do this once and filter them up front
-  /*if (!handle.TraceHasMain()) {
+  /*if (handle.TraceHasUnknown()) {
     return;
   }*/
 
@@ -303,10 +303,12 @@ static void OnExit () {
   const char * trace_str = "{\n\"trace\":\"";
   const char * chunks_str = "\",\n\"chunks\": [\n";
   const char * end_chunks_str = "{}\n]\n},\n";
-  const char * end_str = "{}\n]\n";
+  const char * end_chunks_str_no_comma = "{}\n]\n}\n";
+  const char * end_str = "\n]\n";
 
   WriteToFile(hplgst_outfile, begin_str, internal_strlen(begin_str), &bytes_written);
-  for (auto& alloc_point : all_alloc_points) {
+  for (int i = 0; i < all_alloc_points.size(); i++) {
+    auto& alloc_point = all_alloc_points[i];
     WriteToFile(hplgst_outfile, trace_str, internal_strlen(trace_str), &bytes_written);
     alloc_point.trace().SPrint(buf, buflen, "#%n %p %F %L|");
 
@@ -316,17 +318,20 @@ static void OnExit () {
     alloc_point.ForEachChunk([](HplgstMemoryChunk& chunk, void * arg){
       char buf[2048];
       // reads writes allocated size ts_start ts_end ts_first ts_last
-      internal_snprintf(buf, 2048, "{\"reads\":%d, \"writes\":%d, \"allocated\":%d, \"size\":%lld, \"ts_start\":%lld, \"ts_end\":%lld, \"ts_first\":%lld, \"ts_last\":%lld},\n", chunk.num_reads, chunk.num_writes,
+      internal_snprintf(buf, 2048, "{\"reads\":%d, \"writes\":%d, \"allocated\":%d, \"size\":%lld, \"ts_start\":%llu, \"ts_end\":%llu, \"ts_first\":%llu, \"ts_last\":%llu},\n", chunk.num_reads, chunk.num_writes,
                         chunk.allocated, chunk.size, chunk.timestamp_start - hplgst_start, chunk.timestamp_end - hplgst_start,
-                        chunk.timestamp_first_access - hplgst_start,
-                        chunk.timestamp_last_access - hplgst_start);
+                        chunk.timestamp_first_access > 0 ? chunk.timestamp_first_access - hplgst_start : 0,
+                        chunk.timestamp_last_access > 0 ? chunk.timestamp_last_access - hplgst_start : 0);
       fd_t outfile = *(fd_t*)arg;
       uptr bytes_written;
       WriteToFile(outfile, buf, internal_strlen(buf), &bytes_written);
 
     }, &hplgst_outfile);
 
-    WriteToFile(hplgst_outfile, end_chunks_str, internal_strlen(end_chunks_str), &bytes_written);
+    if (i == all_alloc_points.size() - 1)
+      WriteToFile(hplgst_outfile, end_chunks_str_no_comma, internal_strlen(end_chunks_str_no_comma), &bytes_written);
+    else
+      WriteToFile(hplgst_outfile, end_chunks_str, internal_strlen(end_chunks_str), &bytes_written);
 
   }
   WriteToFile(hplgst_outfile, end_str, internal_strlen(end_str), &bytes_written);
