@@ -304,9 +304,12 @@ static void OnExit () {
   const char * chunks_str = "\",\n\"chunks\": [\n";
   const char * end_chunks_str = "{}\n]\n},\n";
   const char * end_chunks_str_no_comma = "{}\n]\n}\n";
-  const char * end_str = "\n]\n";
+  const char * end_str = "\n]}\n";
 
-  WriteToFile(hplgst_outfile, begin_str, internal_strlen(begin_str), &bytes_written);
+  char name_buf[kMaxPathLength];
+  ReadBinaryName(name_buf, kMaxPathLength);
+  internal_snprintf(buf, buflen, "{\n\"binary\":\"%s\", \n\"data\": [\n", name_buf);
+  WriteToFile(hplgst_outfile, buf, internal_strlen(buf), &bytes_written);
   for (int i = 0; i < all_alloc_points.size(); i++) {
     auto& alloc_point = all_alloc_points[i];
     WriteToFile(hplgst_outfile, trace_str, internal_strlen(trace_str), &bytes_written);
