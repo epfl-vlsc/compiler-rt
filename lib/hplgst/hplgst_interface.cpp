@@ -20,6 +20,7 @@
 #include "hplgst_allocator.h"
 #include "hplgst_thread.h"
 #include "hplgst_timer.h"
+#include "hplgst_tracewriter.h"
 
 bool hplgst_inited;
 bool hplgst_init_is_running;
@@ -255,6 +256,11 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
   }
 }
 
+struct WriterArgs {
+  TraceWriter* writer;
+  u32 stack_id;
+};
+
 static void OnExit () {
 
   // add remaining still-allocated chunks to the stack depot
@@ -291,9 +297,31 @@ static void OnExit () {
     all_alloc_points[i].add_inefficiency(Inefficiency::TopPercentile);
   }
 
+
   // write all alloc points and chunks to file
   // this could be pretty big ...
+  const uptr buflen = 1024*1024;
+  char buf[buflen];  // 1MB because i dont care
+  TraceWriter writer(1024, 1024*1024);
+  WriterArgs args;
+  args.writer = &writer;
 
+  for (int i = 0; i < all_alloc_points.size(); i++) {
+    auto& alloc_point = all_alloc_points[i];
+    alloc_point.trace().SPrint(buf, buflen, "#%n %p %F %L|");
+
+    writer.WriteTrace(buf);
+    args.stack_id = (u32)i;
+
+    alloc_point.ForEachChunk([](HplgstMemoryChunk& chunk, void * arg){
+      WriterArgs* args = (WriterArgs*)arg;
+      args->writer->WriteChunk(chunk, args->stack_id);
+
+    }, &args);
+
+  }
+
+/*
   fd_t hplgst_outfile = OpenFile("hplgst.json", FileAccessMode::WrOnly);
   const uptr buflen = 1024*1024;
   char buf[buflen];  // 1MB because i dont care
@@ -340,6 +368,7 @@ static void OnExit () {
   WriteToFile(hplgst_outfile, end_str, internal_strlen(end_str), &bytes_written);
 
   CloseFile(hplgst_outfile);
+*/
 
   //HplgstStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
 

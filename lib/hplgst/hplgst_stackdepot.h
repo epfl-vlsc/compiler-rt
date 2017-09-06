@@ -20,7 +20,7 @@
 
 namespace __hplgst {
 
-struct HplgstMemoryChunk {
+struct __attribute__((packed)) HplgstMemoryChunk {
   HplgstMemoryChunk(u8 n_reads, u8 n_writes, u8 allocd,
                     u64 sz, u64 ts_start, u64 ts_end) : num_reads(n_reads), num_writes(n_writes),
                                       allocated(allocd), size(sz),
@@ -30,6 +30,7 @@ struct HplgstMemoryChunk {
   u8 num_writes = 0;
   u8 allocated = 0;
   u8 pad;
+  u32 stack_index = 0; // used for file writer
   u64 size = 0;
   u64 timestamp_start = 0;
   u64 timestamp_end = 0;
