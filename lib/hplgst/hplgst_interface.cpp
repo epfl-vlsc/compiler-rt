@@ -314,6 +314,12 @@ static void OnExit () {
     args.stack_id = (u32)i;
 
     alloc_point.ForEachChunk([](HplgstMemoryChunk& chunk, void * arg){
+      chunk.timestamp_start = chunk.timestamp_start - hplgst_start;
+      chunk.timestamp_end = chunk.timestamp_end - hplgst_start;
+      chunk.timestamp_first_access = chunk.timestamp_first_access > 0 ?
+                                     chunk.timestamp_first_access - hplgst_start : 0;
+      chunk.timestamp_last_access = chunk.timestamp_last_access > 0 ?
+                                     chunk.timestamp_last_access - hplgst_start : 0;
       WriterArgs* args = (WriterArgs*)arg;
       args->writer->WriteChunk(chunk, args->stack_id);
 
