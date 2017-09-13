@@ -28,7 +28,7 @@ namespace __hplgst {
   }
 
   void TraceWriter::WriteChunk(HplgstMemoryChunk &chunk, u32 trace_index) {
-    Printf("writing chunk \n");
+    //Printf("writing chunk \n");
 
     RelativeIndex size = static_cast<u16>(sizeof(HplgstMemoryChunk));
     if (chunk_index_length - chunk_index_position < sizeof(size)) {
@@ -48,10 +48,10 @@ namespace __hplgst {
   }
 
   void TraceWriter::WriteTrace(const char *trace_string) {
-    Printf("writing trace capacity is %d, position is %d trace is: \n %s\n", trace_data_length, trace_data_position, trace_string);
+    //Printf("writing trace capacity is %d, position is %d trace is: \n %s\n", trace_data_length, trace_data_position, trace_string);
     uptr len = internal_strlen(trace_string);
     //trace_index.push_back((RelativeIndex) len);
-    Printf("pushing back %d \n", len);
+    //Printf("pushing back %d \n", len);
 
     RelativeIndex size = static_cast<u16>(len);
     if (trace_index_length - trace_index_position < sizeof(size)) {
@@ -76,33 +76,45 @@ namespace __hplgst {
     header.index_size = trace_index_size;
     Printf("writer writing files ...");
 
-    uptr bytes_written;
+    uptr bytes_written, total_written = 0;
     fd_t hplgst_outfile = OpenFile("hplgst.trace", FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
+    total_written += bytes_written;
     if (bytes_written != sizeof(Header))
       Printf("write header failed!!");
     WriteToFile(hplgst_outfile, trace_index, trace_index_position, &bytes_written);
+    total_written += bytes_written;
     if (bytes_written != trace_index_position)
       Printf("write trace index failed!!");
     WriteToFile(hplgst_outfile, trace_data, trace_data_position, &bytes_written);
+    total_written += bytes_written;
     if (bytes_written != trace_data_position)
       Printf("write trace data failed!!");
     CloseFile(hplgst_outfile);
 
+    //Printf("total trace: %d \n", total_written);
+    total_written = 0;
 
     header.index_size = chunk_index_size;
     hplgst_outfile = OpenFile("hplgst.chunks", FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
+    total_written += bytes_written;
     if (bytes_written != sizeof(Header))
       Printf("write chunk header failed!!");
     WriteToFile(hplgst_outfile, chunk_index, chunk_index_position, &bytes_written);
+    total_written += bytes_written;
     if (bytes_written != chunk_index_position)
       Printf("write chunk index failed!!");
     WriteToFile(hplgst_outfile, chunk_data, chunk_data_position, &bytes_written);
+    total_written += bytes_written;
     if (bytes_written != chunk_data_position)
       Printf("write chunk data failed!!");
     CloseFile(hplgst_outfile);
 
+    // for some reason, almost a megabyte of zeroes gets tacked onto the end of the file :-/
+/*    Printf("total chunk: %d \n", total_written);
+    Printf("c data position was %d, index position was %d, total = %d \n", chunk_data_position, chunk_index_position,
+           chunk_data_position+chunk_index_position);*/
     UnmapOrDie(trace_data, trace_data_length);
     UnmapOrDie(chunk_data, chunk_data_length);
 
