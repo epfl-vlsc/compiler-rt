@@ -58,6 +58,7 @@ struct ChunkMetadata {
   u64 timestamp;
   u64 latest_timestamp;
   u64 first_timestamp;
+    u64 alloc_call_time;
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64

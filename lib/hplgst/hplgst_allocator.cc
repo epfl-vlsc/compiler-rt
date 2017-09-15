@@ -44,7 +44,7 @@ static ChunkMetadata *Metadata(const void *p) {
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p_begin));
 }
 
-static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
+static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 ts) {
   if (!p) return;
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
@@ -55,9 +55,11 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   m->stack_trace_id = handle.id();
   m->num_reads = 0;
   m->num_writes = 0;
-  m->timestamp = get_timestamp();
   m->latest_timestamp = 0;  // access timestamps
   m->first_timestamp = 0;
+  u64 now = get_timestamp();
+  m->timestamp = now;
+  m->alloc_call_time = timestamp_diff(ts, now);
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
   //Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
@@ -84,10 +86,12 @@ static void RegisterDeallocation(void *p) {
   chunk.num_reads = m->num_reads;
   chunk.timestamp_last_access = m->latest_timestamp;
   chunk.timestamp_first_access = m->first_timestamp;
+  chunk.alloc_call_time = m->alloc_call_time;
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
                bool cleared) {
+  u64 ts = get_timestamp();
   if (size == 0)
     size = 1;
   if (size > kMaxAllowedMallocSize) {
@@ -98,7 +102,7 @@ void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
   // Do not rely on the allocator to clear the memory (it's slow).
   if (cleared && allocator.FromPrimary(p))
     memset(p, 0, size);
-  RegisterAllocation(stack, p, size);
+  RegisterAllocation(stack, p, size, ts);
   if (&__sanitizer_malloc_hook)
     __sanitizer_malloc_hook(p, size);
   RunMallocHooks(p, size);
@@ -115,6 +119,7 @@ void Deallocate(void *p) {
 
 void *Reallocate(const StackTrace &stack, void *p, uptr new_size,
                  uptr alignment) {
+  u64 ts = get_timestamp();
   RegisterDeallocation(p);
   if (new_size > kMaxAllowedMallocSize) {
     Report("WARNING: Heapologist failed to allocate %zu bytes\n", new_size);
@@ -122,7 +127,7 @@ void *Reallocate(const StackTrace &stack, void *p, uptr new_size,
     return nullptr;
   }
   p = allocator.Reallocate(GetAllocatorCache(), p, new_size, alignment);
-  RegisterAllocation(stack, p, new_size);
+  RegisterAllocation(stack, p, new_size, ts);
   return p;
 }
 

@@ -23,8 +23,8 @@ namespace __hplgst {
 struct __attribute__((packed)) HplgstMemoryChunk {
   HplgstMemoryChunk(u8 n_reads, u8 n_writes, u8 allocd,
                     u64 sz, u64 ts_start, u64 ts_end) : num_reads(n_reads), num_writes(n_writes),
-                                      allocated(allocd), size(sz),
-                                      timestamp_start(ts_start), timestamp_end(ts_end) {}
+                                                        allocated(allocd), size(sz),
+                                                        timestamp_start(ts_start), timestamp_end(ts_end) {}
   HplgstMemoryChunk() {}
   u8 num_reads = 0;
   u8 num_writes = 0;
@@ -36,6 +36,7 @@ struct __attribute__((packed)) HplgstMemoryChunk {
   u64 timestamp_end = 0;
   u64 timestamp_first_access = 0;
   u64 timestamp_last_access = 0;
+  u64 alloc_call_time = 0;
   static bool ChunkComparator(const HplgstMemoryChunk &a, const HplgstMemoryChunk &b);
 };
 
