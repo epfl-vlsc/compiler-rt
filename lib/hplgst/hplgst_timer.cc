@@ -21,6 +21,8 @@
 #include "time.h"
 #elif SANITIZER_MAC
 #include <mach/mach_time.h>
+#include <x86intrin.h>
+
 #endif
 
 #define NS_IN_SEC 1000000000
@@ -28,7 +30,8 @@
 namespace __hplgst {
 
   u64 get_timestamp() {
-#if SANITIZER_LINUX
+    return __rdtsc();
+/*#if SANITIZER_LINUX
     struct timespec time;
     clock_gettime(CLOCK_MONOTONIC, &time);
     return (u64) time.tv_sec * NS_IN_SEC + (u64) time.tv_nsec;
@@ -36,12 +39,12 @@ namespace __hplgst {
     return mach_absolute_time();
 #else
     return 0;
-#endif
+#endif*/
 
   }
 
   u64 timestamp_diff(u64 start, u64 end) {
-#if SANITIZER_MAC
+/*#if SANITIZER_MAC
     static mach_timebase_info_data_t sTimebaseInfo;
     if ( sTimebaseInfo.denom == 0 ) {
       (void) mach_timebase_info(&sTimebaseInfo);
@@ -52,7 +55,8 @@ namespace __hplgst {
     return end - start;
 #else
     return 0;
-#endif
+#endif*/
+    return end - start;
   }
 
 }
