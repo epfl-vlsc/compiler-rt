@@ -275,14 +275,14 @@ static void OnExit () {
   Printf("Heapologist sorting chunks ...\n");
   HplgstStackDepot_SortAllChunkVectors();
 
-  Printf("Heapologist processing ...\n");
+/*  Printf("Heapologist processing ...\n");
   HplgstStackDepot_ForEachStackTrace(FindUnusedAllocsCb, nullptr);
   Printf("Heapologist processing short lt ...\n");
   HplgstStackDepot_ForEachStackTrace(FindShortLifetimeAllocs, nullptr);
   Printf("Heapologist processing early allocs ...\n");
   HplgstStackDepot_ForEachStackTrace(FindEarlyAllocLateFreeCb, nullptr);
   Printf("Heapologist processing bad realloc ...\n");
-  HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);
+  HplgstStackDepot_ForEachStackTrace(FindBadReallocsCb, nullptr);*/
 
   // making a copy of stack trace handles, pointed-to data
   // is not duplicated

@@ -147,6 +147,8 @@ class HplgstMetadata {
   void set_first_timestamp(u64 ts);
   u64 first_timestamp();
   u64 latest_timestamp();
+  u32 creating_thread();
+  void set_multi_thread();
  //private:
   void *metadata_;
 };

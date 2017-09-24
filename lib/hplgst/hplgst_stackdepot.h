@@ -29,7 +29,7 @@ struct __attribute__((packed)) HplgstMemoryChunk {
   u8 num_reads = 0;
   u8 num_writes = 0;
   u8 allocated = 0;
-  u8 pad;
+  u8 multi_thread = 0;
   u32 stack_index = 0; // used for file writer
   u64 size = 0;
   u64 timestamp_start = 0;

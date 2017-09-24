@@ -18,6 +18,7 @@
 #include "hplgst.h"
 #include "hplgst_timer.h"
 #include "hplgst_allocator.h"
+#include "hplgst_thread.h"
 
 namespace __hplgst {
 
@@ -38,6 +39,12 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
       m.incr_writes();
     } else {
       m.incr_reads();
+    }
+
+    // this is prob too expensive
+    // TODO make optional
+    if (GetCurrentThread() != m.creating_thread()) {
+      m.set_multi_thread();
     }
   }
 }

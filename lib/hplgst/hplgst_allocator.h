@@ -47,7 +47,7 @@ struct ChunkMetadata {
   u8 allocated : 8;  // Must be first.
   u8 num_reads : 8;
   u8 num_writes : 8;
-  u8 pad : 8;
+  u8 multi_thread : 8;
   #if SANITIZER_WORDSIZE == 64
     uptr requested_size : 64;
   #else
@@ -55,10 +55,13 @@ struct ChunkMetadata {
     uptr padding : 32;
   #endif
   u32 stack_trace_id : 32;
+  u32 creating_thread;
   u64 timestamp;
   u64 latest_timestamp;
   u64 first_timestamp;
-    u64 alloc_call_time;
+  u64 alloc_call_time;
+  u32 access_interval_low;
+  u32 access_interval_high;
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64
