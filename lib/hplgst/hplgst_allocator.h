@@ -39,6 +39,8 @@ void AllocatorThreadFinish();
 void InitializeAllocator();
 bool PointerIsAllocator(void * p);
 
+void* GetBlockBegin(void * p);
+
 const bool kAlwaysClearMemory = true;
 
 #define MAX_READWRITES 255
@@ -60,8 +62,8 @@ struct ChunkMetadata {
   u64 latest_timestamp;
   u64 first_timestamp;
   u64 alloc_call_time;
-  u32 access_interval_low;
-  u32 access_interval_high;
+  u32 access_interval_low = 0xffffffff;
+  u32 access_interval_high = 0;
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64

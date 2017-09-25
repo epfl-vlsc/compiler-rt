@@ -40,6 +40,10 @@ void AllocatorThreadFinish() {
   allocator.SwallowCache(GetAllocatorCache());
 }
 
+void* GetBlockBegin(void * p) {
+  return allocator.GetBlockBegin(p);
+}
+
 static ChunkMetadata *Metadata(const void *p) {
   void * p_begin = allocator.GetBlockBegin(p);
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p_begin));
@@ -90,6 +94,9 @@ static void RegisterDeallocation(void *p) {
   chunk.timestamp_last_access = m->latest_timestamp;
   chunk.timestamp_first_access = m->first_timestamp;
   chunk.alloc_call_time = m->alloc_call_time;
+  chunk.multi_thread = m->multi_thread;
+  chunk.access_interval_low = m->access_interval_low;
+  chunk.access_interval_high = m->access_interval_high;
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
@@ -263,6 +270,19 @@ void HplgstMetadata::set_multi_thread() {
 
   void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
+}
+
+u32 HplgstMetadata::interval_low() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low;
+}
+u32 HplgstMetadata::interval_high() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high;
+}
+void HplgstMetadata::set_interval_low(u32 value) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low = value;
+}
+void HplgstMetadata::set_interval_high(u32 value) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high = value;
 }
 
 } // namespace __hplgst

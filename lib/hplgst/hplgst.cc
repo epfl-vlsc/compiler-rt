@@ -41,6 +41,14 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
       m.incr_reads();
     }
 
+    // TODO make optional
+    // use uptr for arithmetic
+    uptr begin = (uptr)GetBlockBegin(p);
+    if (Addr - begin < m.interval_low())
+      m.set_interval_low(Addr-begin);
+    if (Addr-begin+Size > m.interval_high())
+      m.set_interval_high(Addr-begin+Size);
+
     // this is prob too expensive
     // TODO make optional
     if (GetCurrentThread() != m.creating_thread()) {
