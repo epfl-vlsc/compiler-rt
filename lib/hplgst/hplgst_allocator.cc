@@ -67,6 +67,8 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 
   m->alloc_call_time = timestamp_diff(ts, now);
   m->creating_thread = GetCurrentThread();
   m->multi_thread = 0;
+  m->access_interval_low = 0xffffffff;
+  m->access_interval_high = 0;
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
   //Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));

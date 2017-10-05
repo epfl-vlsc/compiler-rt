@@ -311,6 +311,7 @@ static void OnExit () {
     alloc_point.trace().SPrint(buf, buflen, "#%n %p %F %L|");
 
     writer.WriteTrace(buf);
+    //writer.WriteTrace(alloc_point.trace().trace, alloc_point.trace().size);
     args.stack_id = (u32)i;
 
     alloc_point.ForEachChunk([](HplgstMemoryChunk& chunk, void * arg){
@@ -320,7 +321,7 @@ static void OnExit () {
                                      chunk.timestamp_first_access - hplgst_start : 0;
       chunk.timestamp_last_access = chunk.timestamp_last_access > 0 ?
                                      chunk.timestamp_last_access - hplgst_start : 0;
-      if (chunk.access_interval_high != 0 && (chunk.access_interval_high - chunk.access_interval_high > chunk.size))
+      if (chunk.access_interval_high != 0 && (chunk.access_interval_high - chunk.access_interval_low > chunk.size))
         Printf("WARNING: chunk had access interval larger than size\n");
       WriterArgs* args = (WriterArgs*)arg;
       args->writer->WriteChunk(chunk, args->stack_id);

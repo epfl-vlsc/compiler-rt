@@ -47,6 +47,29 @@ namespace __hplgst {
 
   }
 
+  // this version writes the stack trace addresses directly, assuming
+  // that downstream tools will use the symbolizer and binary to decode
+  void TraceWriter::WriteTrace(const uptr* trace, u32 sz) {
+    Printf("the call stack size is %d\n", sz);
+    return;
+
+    RelativeIndex size = static_cast<u16>(sz * sizeof(uptr)); // size in bytes
+    if (trace_index_length - trace_index_position < sizeof(size)) {
+      resize(trace_index, trace_index_length); // double
+    }
+
+    internal_memcpy(trace_index + trace_index_position, reinterpret_cast<const char*>(&size), sizeof(size));
+    trace_index_position += sizeof(size);
+    trace_index_size++;
+
+    if (trace_data_length - trace_data_position < size) {
+      resize(trace_data, trace_data_length); // double
+    }
+    internal_memcpy(trace_data + trace_data_position, trace, size);
+    trace_data_position += size;
+
+  }
+
   void TraceWriter::WriteTrace(const char *trace_string) {
     //Printf("writing trace capacity is %d, position is %d trace is: \n %s\n", trace_data_length, trace_data_position, trace_string);
     uptr len = internal_strlen(trace_string);
