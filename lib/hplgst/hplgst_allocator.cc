@@ -18,6 +18,7 @@
 #include "hplgst_stackdepot.h"
 #include "hplgst_allocator.h"
 #include "hplgst_timer.h"
+#include "hplgst_thread.h"
 
 extern "C" void *memset(void *ptr, int value, uptr num);
 
@@ -37,6 +38,10 @@ bool PointerIsAllocator(void *p) {
 
 void AllocatorThreadFinish() {
   allocator.SwallowCache(GetAllocatorCache());
+}
+
+void* GetBlockBegin(void * p) {
+  return allocator.GetBlockBegin(p);
 }
 
 static ChunkMetadata *Metadata(const void *p) {
@@ -60,6 +65,10 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 
   u64 now = get_timestamp();
   m->timestamp = now;
   m->alloc_call_time = timestamp_diff(ts, now);
+  m->creating_thread = GetCurrentThread();
+  m->multi_thread = 0;
+  m->access_interval_low = 0xffffffff;
+  m->access_interval_high = 0;
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
   //Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
@@ -87,6 +96,9 @@ static void RegisterDeallocation(void *p) {
   chunk.timestamp_last_access = m->latest_timestamp;
   chunk.timestamp_first_access = m->first_timestamp;
   chunk.alloc_call_time = m->alloc_call_time;
+  chunk.multi_thread = m->multi_thread;
+  chunk.access_interval_low = m->access_interval_low;
+  chunk.access_interval_high = m->access_interval_high;
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
@@ -250,8 +262,29 @@ u64 HplgstMetadata::latest_timestamp() {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp;
 }
 
+u32 HplgstMetadata::creating_thread() {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->creating_thread;
+}
+
+void HplgstMetadata::set_multi_thread() {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread = 1;
+}
+
   void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
+}
+
+u32 HplgstMetadata::interval_low() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low;
+}
+u32 HplgstMetadata::interval_high() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high;
+}
+void HplgstMetadata::set_interval_low(u32 value) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low = value;
+}
+void HplgstMetadata::set_interval_high(u32 value) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high = value;
 }
 
 } // namespace __hplgst

@@ -17,6 +17,7 @@ namespace __hplgst {
     ~TraceWriter();
 
     void WriteTrace(const char *trace_string);
+    void WriteTrace(const uptr* trace, u32 sz);
 
     void WriteChunk(HplgstMemoryChunk &chunk, u32 trace_index);
 
