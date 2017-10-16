@@ -99,8 +99,13 @@ namespace __hplgst {
     header.index_size = trace_index_size;
     Printf("writer writing files ...");
 
+    char namebuf[4096];
+    ReadBinaryNameCached(namebuf, 4096);
+    u32 len = internal_strlen(namebuf);
+    internal_strncpy(namebuf + len, ".trace", 6);
+
     uptr bytes_written, total_written = 0;
-    fd_t hplgst_outfile = OpenFile("hplgst.trace", FileAccessMode::WrOnly);
+    fd_t hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
     total_written += bytes_written;
     if (bytes_written != sizeof(Header))
@@ -119,7 +124,9 @@ namespace __hplgst {
     total_written = 0;
 
     header.index_size = chunk_index_size;
-    hplgst_outfile = OpenFile("hplgst.chunks", FileAccessMode::WrOnly);
+    internal_strncpy(namebuf + len, ".chunks", 7);
+
+    hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
     total_written += bytes_written;
     if (bytes_written != sizeof(Header))
