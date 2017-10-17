@@ -97,12 +97,11 @@ namespace __hplgst {
     header.version_major = 0;
     header.segment_start = sizeof(Header);
     header.index_size = trace_index_size;
-    Printf("writer writing files ...");
+    Printf("writer writing files ...\n");
 
+    uptr pid = internal_getpid();
     char namebuf[4096];
-    u32 len = internal_strlen(GetProcessName());
-    internal_strncpy(namebuf, GetProcessName(), len);
-    internal_strncpy(namebuf + len, ".trace", 6);
+    internal_snprintf(namebuf, 4096, "%s-%d.trace", GetProcessName(), pid);
     Printf("Opening file %s \n", namebuf);
 
     uptr bytes_written, total_written = 0;
@@ -131,7 +130,7 @@ namespace __hplgst {
     total_written = 0;
 
     header.index_size = chunk_index_size;
-    internal_strncpy(namebuf + len, ".chunks", 7);
+    internal_snprintf(namebuf, 4096, "%s-%d.chunks", GetProcessName(), pid);
     Printf("Opening file %s \n", namebuf);
 
     hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
