@@ -21,6 +21,9 @@ namespace __hplgst {
 
     void WriteChunk(HplgstMemoryChunk &chunk, u32 trace_index);
 
+    // write out the trace and chunk buffers to file
+    bool OutputFiles();
+
   private:
     typedef u16 RelativeIndex;
 

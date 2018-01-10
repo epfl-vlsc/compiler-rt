@@ -330,6 +330,9 @@ static void OnExit () {
 
   }
 
+  if (!writer.OutputFiles())
+    Printf("Error writing trace or chunk files!\n");
+
 /*
   fd_t hplgst_outfile = OpenFile("hplgst.json", FileAccessMode::WrOnly);
   const uptr buflen = 1024*1024;

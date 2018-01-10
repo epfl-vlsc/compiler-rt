@@ -76,7 +76,7 @@ namespace __hplgst {
     //trace_index.push_back((RelativeIndex) len);
     //Printf("pushing back %d \n", len);
 
-    RelativeIndex size = static_cast<u16>(len);
+    auto size = static_cast<RelativeIndex >(len);
     if (trace_index_length - trace_index_position < sizeof(size)) {
       resize(trace_index, trace_index_length); // double
     }
@@ -91,56 +91,80 @@ namespace __hplgst {
     trace_data_position += len;
   }
 
-  TraceWriter::~TraceWriter() {
+  bool TraceWriter::OutputFiles() {
     Header header;
     header.version_minor = 1;
     header.version_major = 0;
     header.segment_start = sizeof(Header);
     header.index_size = trace_index_size;
-    Printf("writer writing files ...");
+    Printf("writer writing files ...\n");
+
+    uptr pid = internal_getpid();
+    char namebuf[4096];
+    internal_snprintf(namebuf, 4096, "%s-%d.trace", GetProcessName(), pid);
+    Printf("Opening file %s \n", namebuf);
 
     uptr bytes_written, total_written = 0;
-    fd_t hplgst_outfile = OpenFile("hplgst.trace", FileAccessMode::WrOnly);
+    fd_t hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
     total_written += bytes_written;
-    if (bytes_written != sizeof(Header))
+    if (bytes_written != sizeof(Header)) {
       Printf("write header failed!!");
+      return false;
+    }
     WriteToFile(hplgst_outfile, trace_index, trace_index_position, &bytes_written);
     total_written += bytes_written;
-    if (bytes_written != trace_index_position)
+    if (bytes_written != trace_index_position) {
       Printf("write trace index failed!!");
+      return false;
+    }
     WriteToFile(hplgst_outfile, trace_data, trace_data_position, &bytes_written);
     total_written += bytes_written;
-    if (bytes_written != trace_data_position)
+    if (bytes_written != trace_data_position) {
       Printf("write trace data failed!!");
+      return false;
+    }
     CloseFile(hplgst_outfile);
 
     //Printf("total trace: %d \n", total_written);
     total_written = 0;
 
     header.index_size = chunk_index_size;
-    hplgst_outfile = OpenFile("hplgst.chunks", FileAccessMode::WrOnly);
+    internal_snprintf(namebuf, 4096, "%s-%d.chunks", GetProcessName(), pid);
+    Printf("Opening file %s \n", namebuf);
+
+    hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
     total_written += bytes_written;
-    if (bytes_written != sizeof(Header))
+    if (bytes_written != sizeof(Header)) {
       Printf("write chunk header failed!!");
+      return false;
+    }
     WriteToFile(hplgst_outfile, chunk_index, chunk_index_position, &bytes_written);
     total_written += bytes_written;
-    if (bytes_written != chunk_index_position)
+    if (bytes_written != chunk_index_position) {
       Printf("write chunk index failed!!");
+      return false;
+    }
     WriteToFile(hplgst_outfile, chunk_data, chunk_data_position, &bytes_written);
     total_written += bytes_written;
-    if (bytes_written != chunk_data_position)
+    if (bytes_written != chunk_data_position) {
       Printf("write chunk data failed!!");
+      return false;
+    }
     CloseFile(hplgst_outfile);
 
     // for some reason, almost a megabyte of zeroes gets tacked onto the end of the file :-/
 /*    Printf("total chunk: %d \n", total_written);
     Printf("c data position was %d, index position was %d, total = %d \n", chunk_data_position, chunk_index_position,
            chunk_data_position+chunk_index_position);*/
+
+    return true;
+  }
+
+  TraceWriter::~TraceWriter() {
     UnmapOrDie(trace_data, trace_data_length);
     UnmapOrDie(chunk_data, chunk_data_length);
-
   }
 
   void TraceWriter::resize(char *&data, u64 &length) {
