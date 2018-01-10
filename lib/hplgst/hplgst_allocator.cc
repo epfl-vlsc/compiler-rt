@@ -86,7 +86,7 @@ static void RegisterDeallocation(void *p) {
   // store the record of this chunk along with its allocation point stack trace
   // TODO we could also store the free point stack trace?
   HplgstStackDepotHandle handle = HplgstStackDepotGetHandle(m->stack_trace_id);
-  HplgstMemoryChunk& chunk = handle.new_chunk();
+  HplgstMemoryChunk chunk;
   chunk.allocated = 0;
   chunk.timestamp_start = m->timestamp;
   chunk.timestamp_end = ts;
@@ -99,6 +99,7 @@ static void RegisterDeallocation(void *p) {
   chunk.multi_thread = m->multi_thread;
   chunk.access_interval_low = m->access_interval_low;
   chunk.access_interval_high = m->access_interval_high;
+  handle.new_chunk(chunk);
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
@@ -270,7 +271,15 @@ void HplgstMetadata::set_multi_thread() {
   reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread = 1;
 }
 
-  void ForEachChunk(ForEachChunkCallback callback, void *arg) {
+u8 HplgstMetadata::multi_thread() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread;
+}
+
+u64 HplgstMetadata::alloc_call_time() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->alloc_call_time;
+}
+
+void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }
 

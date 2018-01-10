@@ -38,15 +38,20 @@ void AddStillAllocatedCb(uptr chunk, void *arg) {
   if (m.allocated()) {
     //Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
     HplgstStackDepotHandle handle = HplgstStackDepotGetHandle(m.stack_trace_id());
-    HplgstMemoryChunk& chunk = handle.new_chunk();
-    chunk.allocated = 1;
-    chunk.timestamp_start = m.timestamp_start();
-    chunk.timestamp_end = end_ts;
-    chunk.size = m.requested_size();
-    chunk.num_writes = m.num_writes();
-    chunk.num_reads = m.num_reads();
-    chunk.timestamp_first_access = m.first_timestamp();
-    chunk.timestamp_last_access = m.latest_timestamp();
+    HplgstMemoryChunk newchunk;
+    newchunk.allocated = 1;
+    newchunk.timestamp_start = m.timestamp_start();
+    newchunk.timestamp_end = end_ts;
+    newchunk.size = m.requested_size();
+    newchunk.num_writes = m.num_writes();
+    newchunk.num_reads = m.num_reads();
+    newchunk.timestamp_first_access = m.first_timestamp();
+    newchunk.timestamp_last_access = m.latest_timestamp();
+    newchunk.alloc_call_time = m.alloc_call_time();
+    newchunk.multi_thread = m.multi_thread();
+    newchunk.access_interval_low = m.interval_low();
+    newchunk.access_interval_high = m.interval_high();
+    handle.new_chunk(newchunk);
   }
 }
 
@@ -257,22 +262,26 @@ void PrintCollectedStats(HplgstStackDepotHandle& handle, void* arg) {
 }
 
 struct WriterArgs {
-  TraceWriter* writer;
-  u32 stack_id;
+  TraceWriter* writer = nullptr;
+  u32 stack_id = 0;
 };
 
 static void OnExit () {
 
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
-  Printf("Heapologist pre-processing still allocated chunks ...\n");
+  //Printf("Heapologist pre-processing still allocated chunks ...\n");
   u64 end_ts = get_timestamp();
   ForEachChunk(AddStillAllocatedCb, &end_ts);
+
+  //Printf("total hits: %lld, heap hits: %lld\n", total_hits, heap_hits);
+  if (getFlags()->no_output)
+    return;
 
   // run all the different analyses across the different allocation
   // point stack traces
   // TODO add args to enable / disable individual analyses
-  Printf("Heapologist sorting chunks ...\n");
+  //Printf("Heapologist sorting chunks ...\n");
   HplgstStackDepot_SortAllChunkVectors();
 
 /*  Printf("Heapologist processing ...\n");
@@ -288,7 +297,7 @@ static void OnExit () {
   // is not duplicated
   InternalMmapVector<HplgstStackDepotHandle> all_alloc_points(128);
   HplgstStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
-  Printf("Program has %d active allocation points this run\n", all_alloc_points.size());
+  //Printf("Program has %d active allocation points this run\n", all_alloc_points.size());
   // sort to calculate percentile
   InternalSort(&all_alloc_points, all_alloc_points.size(), HplgstStackDepotHandle::ChunkNumComparator);
   float percentile = (float) getFlags()->percentile / 100.0f;

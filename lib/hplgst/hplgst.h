@@ -55,6 +55,8 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
     __hplgst_init((ToolType)0, nullptr);                \
 } while (0)
 
+  extern u64 total_hits;
+  extern u64 heap_hits;
 }  // namespace __hplgst
 
 extern bool hplgst_inited;

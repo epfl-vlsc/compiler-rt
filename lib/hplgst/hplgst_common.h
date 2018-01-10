@@ -151,6 +151,8 @@ class HplgstMetadata {
   void set_multi_thread();
   u32 interval_low() const;
   u32 interval_high() const;
+  u8 multi_thread() const;
+  u64 alloc_call_time() const;
   void set_interval_low(u32 value);
   void set_interval_high(u32 value);
  //private:
