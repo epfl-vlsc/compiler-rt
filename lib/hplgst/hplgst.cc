@@ -22,13 +22,18 @@
 
 namespace __hplgst {
 
+u64 total_hits = 0;
+u64 heap_hits = 0;
+
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 /*  VPrintf(3, "in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
           IsWrite ? 'w' : 'r', Addr, Size);*/
 
   // TODO do we need Size or PC?
+  total_hits++;
   void *p = (void*)Addr;
   if (PointerIsAllocator(p) ) {
+    heap_hits++;
     HplgstMetadata m(Addr);
     u64 ts = get_timestamp();
     if (m.first_timestamp() == 0)

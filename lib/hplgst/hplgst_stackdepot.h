@@ -63,6 +63,7 @@ enum Inefficiency : u64 {
 struct HplgstStackDepotNode;
 struct HplgstStackDepotHandle {
   HplgstStackDepotNode *node_;
+  StaticSpinMutex mu_;
   HplgstStackDepotHandle() : node_(nullptr) {}
   explicit HplgstStackDepotHandle(HplgstStackDepotNode *node) : node_(node) {}
   bool valid() { return node_; }
@@ -70,7 +71,7 @@ struct HplgstStackDepotHandle {
   int use_count();
   void inc_use_count_unsafe();
   StackTrace trace();
-  HplgstMemoryChunk& new_chunk();
+  void new_chunk(HplgstMemoryChunk& newChunk);
   void ForEachChunk(ForEachMemChunkCb func, void* arg);
   bool TraceHasMain();
   bool TraceHasUnknown();

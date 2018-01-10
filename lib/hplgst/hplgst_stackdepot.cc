@@ -99,10 +99,12 @@ struct HplgstStackDepotNode {
 COMPILER_CHECK(HplgstStackDepotNode::kMaxUseCount == (u32)kStackDepotMaxUseCount);
 
 u32 HplgstStackDepotHandle::id() { return node_->id; }
+
 int HplgstStackDepotHandle::use_count() {
   return atomic_load(&node_->hash_and_use_count, memory_order_relaxed) &
          HplgstStackDepotNode::kUseCountMask;
 }
+
 void HplgstStackDepotHandle::inc_use_count_unsafe() {
   u32 prev =
       atomic_fetch_add(&node_->hash_and_use_count, 1, memory_order_relaxed) &
@@ -114,11 +116,10 @@ StackTrace HplgstStackDepotHandle::trace() {
   return StackTrace(&node_->stack[0], node_->size, node_->tag);
 }
 
-HplgstMemoryChunk& HplgstStackDepotHandle::new_chunk() {
+void HplgstStackDepotHandle::new_chunk(HplgstMemoryChunk& newChunk) {
   ChunkVec* vec = node_->chunk_vec;
-  HplgstMemoryChunk newChunk;
+  SpinMutexLock l(&mu_); // multiple threads can free chunks at the same time, we need to sync
   vec->push_back(newChunk);
-  return vec->back();
 }
 
 uptr HplgstStackDepotHandle::total_chunks() const {
@@ -133,54 +134,21 @@ void HplgstStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
   }
 }
 
-bool HplgstStackDepotHandle::TraceHasMain() {
-
-  for (uptr i = 0; i < node_->size && node_->stack[i]; i++) {
-    uptr pc = StackTrace::GetPreviousInstructionPc(node_->stack[i]);
-    SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
-    CHECK(frames);
-    for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
-      /*if (cur->info.function && internal_strstr(cur->info.function, "unknown module") != nullptr){
-        return true;
-      }*/
-      if (!cur->info.module)
-        return true;
-    }
-    frames->ClearAll();
-  }
-  return false;
+void HplgstStackDepotHandle::add_inefficiency(Inefficiency i) {
+  node_->inefficiencies |= i;
 }
 
-bool HplgstStackDepotHandle::TraceHasUnknown() {
-
-  for (uptr i = 0; i < node_->size && node_->stack[i]; i++) {
-    uptr pc = StackTrace::GetPreviousInstructionPc(node_->stack[i]);
-    SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
-    CHECK(frames);
-    for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
-      if (!cur->info.module)
-        return true;
-    }
-    frames->ClearAll();
-  }
-  return false;
+bool HplgstStackDepotHandle::has_inefficiency(Inefficiency i) {
+  return node_->inefficiencies & i;
 }
 
-  void HplgstStackDepotHandle::add_inefficiency(Inefficiency i) {
-    node_->inefficiencies |= i;
-  }
+bool HplgstStackDepotHandle::has_inefficiencies() {
+  return node_->inefficiencies != 0;
+}
 
-  bool HplgstStackDepotHandle::has_inefficiency(Inefficiency i) {
-    return node_->inefficiencies & i;
-  }
-
-  bool HplgstStackDepotHandle::has_inefficiencies() {
-    return node_->inefficiencies != 0;
-  }
-
-  bool HplgstStackDepotHandle::ChunkNumComparator(const HplgstStackDepotHandle &a, const HplgstStackDepotHandle &b) {
-    return a.total_chunks() < b.total_chunks();
-  }
+bool HplgstStackDepotHandle::ChunkNumComparator(const HplgstStackDepotHandle &a, const HplgstStackDepotHandle &b) {
+  return a.total_chunks() < b.total_chunks();
+}
 
 
 // FIXME(dvyukov): this single reserved bit is used in TSan.

@@ -51,6 +51,11 @@ namespace __hplgst {
   // that downstream tools will use the symbolizer and binary to decode
   void TraceWriter::WriteTrace(const uptr* trace, u32 sz) {
     Printf("the call stack size is %d\n", sz);
+    Printf("trace addrs are \n");
+    for (u32 i = 0; i < sz && trace[i]; i++) {
+      uptr pc = StackTrace::GetPreviousInstructionPc(trace[i]);
+      Printf("%llx\n", pc);
+    }
     return;
 
     RelativeIndex size = static_cast<u16>(sz * sizeof(uptr)); // size in bytes
@@ -97,12 +102,12 @@ namespace __hplgst {
     header.version_major = 0;
     header.segment_start = sizeof(Header);
     header.index_size = trace_index_size;
-    Printf("writer writing files ...\n");
+    //Printf("writer writing files ...\n");
 
     uptr pid = internal_getpid();
     char namebuf[4096];
     internal_snprintf(namebuf, 4096, "%s-%d.trace", GetProcessName(), pid);
-    Printf("Opening file %s \n", namebuf);
+    //Printf("Trace file written to --> %s \n", namebuf);
 
     uptr bytes_written, total_written = 0;
     fd_t hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
@@ -131,7 +136,7 @@ namespace __hplgst {
 
     header.index_size = chunk_index_size;
     internal_snprintf(namebuf, 4096, "%s-%d.chunks", GetProcessName(), pid);
-    Printf("Opening file %s \n", namebuf);
+    //Printf("Chunks file written to --> %s \n", namebuf);
 
     hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
     WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
@@ -140,12 +145,14 @@ namespace __hplgst {
       Printf("write chunk header failed!!");
       return false;
     }
+    //Printf("writing %d bytes to file\n", chunk_index_position);
     WriteToFile(hplgst_outfile, chunk_index, chunk_index_position, &bytes_written);
     total_written += bytes_written;
     if (bytes_written != chunk_index_position) {
       Printf("write chunk index failed!!");
       return false;
     }
+    //Printf("writing %d bytes to file\n", chunk_data_position);
     WriteToFile(hplgst_outfile, chunk_data, chunk_data_position, &bytes_written);
     total_written += bytes_written;
     if (bytes_written != chunk_data_position) {
