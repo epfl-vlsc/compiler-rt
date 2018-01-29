@@ -58,8 +58,8 @@ if(COMPILER_RT_HAS_HPLGST)
                 $<TARGET_OBJECTS:RTSanitizerCommon.${arch}>
                 $<TARGET_OBJECTS:RTSanitizerCommonLibc.${arch}>
                 $<TARGET_OBJECTS:RTHplgstCommon.${arch}>
-        CFLAGS ${HPLGST_CFLAGS}
-        PARENT_TARGET hplgst)
+        CFLAGS ${HPLGST_CFLAGS})
+
     endforeach()
   endif()
 endif()
