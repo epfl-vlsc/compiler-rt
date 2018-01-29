@@ -29,7 +29,6 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 /*  VPrintf(3, "in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
           IsWrite ? 'w' : 'r', Addr, Size);*/
 
-  // TODO do we need Size or PC?
   total_hits++;
   void *p = (void*)Addr;
   if (PointerIsAllocator(p) ) {
@@ -48,17 +47,17 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 
     // TODO make optional
     // use uptr for arithmetic
-    uptr begin = (uptr)GetBlockBegin(p);
+    /*uptr begin = (uptr)GetBlockBegin(p);
     if (Addr - begin < m.interval_low())
       m.set_interval_low(Addr-begin);
     if (Addr-begin+Size > m.interval_high())
-      m.set_interval_high((u32)Addr-begin+Size);
+      m.set_interval_high((u32)Addr-begin+Size);*/
 
     // this is prob too expensive
     // TODO make optional
-    if (GetCurrentThread() != m.creating_thread()) {
+    /*if (GetCurrentThread() != m.creating_thread()) {
       m.set_multi_thread();
-    }
+    }*/
   }
 }
 

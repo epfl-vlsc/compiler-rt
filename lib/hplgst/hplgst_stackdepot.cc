@@ -118,7 +118,7 @@ StackTrace HplgstStackDepotHandle::trace() {
 
 void HplgstStackDepotHandle::new_chunk(HplgstMemoryChunk& newChunk) {
   ChunkVec* vec = node_->chunk_vec;
-  SpinMutexLock l(&mu_); // multiple threads can free chunks at the same time, we need to sync
+  //SpinMutexLock l(&mu_); // multiple threads can free chunks at the same time, we need to sync
   vec->push_back(newChunk);
 }
 

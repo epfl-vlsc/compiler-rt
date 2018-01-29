@@ -268,6 +268,8 @@ struct WriterArgs {
 
 static void OnExit () {
 
+  if (getFlags()->no_output)
+    return;
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
   //Printf("Heapologist pre-processing still allocated chunks ...\n");
@@ -275,8 +277,6 @@ static void OnExit () {
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
   //Printf("total hits: %lld, heap hits: %lld\n", total_hits, heap_hits);
-  if (getFlags()->no_output)
-    return;
 
   // run all the different analyses across the different allocation
   // point stack traces
