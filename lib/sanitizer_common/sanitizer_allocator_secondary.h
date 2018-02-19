@@ -68,6 +68,7 @@ class LargeMmapAllocator {
       stats.by_size_log[size_log]++;
       stat->Add(AllocatorStatAllocated, map_size);
       stat->Add(AllocatorStatMapped, map_size);
+      EnsureSortedChunks();
     }
     return reinterpret_cast<void*>(res);
   }
@@ -105,6 +106,7 @@ class LargeMmapAllocator {
       stats.currently_allocated -= h->map_size;
       stat->Sub(AllocatorStatAllocated, h->map_size);
       stat->Sub(AllocatorStatMapped, h->map_size);
+      EnsureSortedChunks();
     }
     MapUnmapCallback().OnUnmap(h->map_beg, h->map_size);
     UnmapOrDie(reinterpret_cast<void*>(h->map_beg), h->map_size);
@@ -185,6 +187,12 @@ class LargeMmapAllocator {
     //SpinMutexLock l(&mutex_);
     uptr nearest_chunk = 0;
     if (chunks_sorted_) {
+      auto n = n_chunks_;
+      auto min_mmap_ = reinterpret_cast<uptr>(chunks_[0]);
+      auto max_mmap_ =
+              reinterpret_cast<uptr>(chunks_[n - 1]) + chunks_[n - 1]->map_size;
+      if (p < min_mmap_ || p >= max_mmap_) // early exit case
+        return nullptr;
       int start = 0;
       int end = n_chunks_ - 1;
       int mid;
