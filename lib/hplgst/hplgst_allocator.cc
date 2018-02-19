@@ -41,7 +41,7 @@ void AllocatorThreadFinish() {
 }
 
 void* GetBlockBegin(void * p) {
-  return allocator.GetBlockBegin(p);
+  return allocator.GetBlockBeginUnsafe(p);
 }
 
 static ChunkMetadata *Metadata(const void *p) {

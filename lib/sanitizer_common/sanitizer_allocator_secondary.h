@@ -184,12 +184,33 @@ class LargeMmapAllocator {
     
     //SpinMutexLock l(&mutex_);
     uptr nearest_chunk = 0;
-    // Cache-friendly linear search.
-    for (uptr i = 0; i < n_chunks_; i++) {
-      uptr ch = reinterpret_cast<uptr>(chunks_[i]);
-      if (p < ch) continue;  // p is at left to this chunk, skip it.
-      if (p - ch < p - nearest_chunk)
-        nearest_chunk = ch;
+    if (chunks_sorted_) {
+      int start = 0;
+      int end = n_chunks_ - 1;
+      int mid;
+      // binary search if sorted
+      // its possible that the array will change during search, so we might miss an access
+      while (start <= end)
+      {
+        mid = (start + end) / 2;
+        uptr ch = reinterpret_cast<uptr>(chunks_[mid]);
+        if (p < ch)
+          end = mid - 1;
+        else if (p - ch < p - nearest_chunk) {
+          nearest_chunk = ch;
+          start = mid + 1;
+        } else {
+          start = mid + 1;
+        }
+      }
+    } else {
+      // Cache-friendly linear search.
+      for (uptr i = 0; i < n_chunks_; i++) {
+        uptr ch = reinterpret_cast<uptr>(chunks_[i]);
+        if (p < ch) continue;  // p is at left to this chunk, skip it.
+        if (p - ch < p - nearest_chunk)
+          nearest_chunk = ch;
+      }
     }
     if (!nearest_chunk)
       return nullptr;
