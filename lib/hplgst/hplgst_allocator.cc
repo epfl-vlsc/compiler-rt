@@ -33,7 +33,7 @@ void InitializeAllocator() {
 }
 
 bool PointerIsAllocator(void *p) {
-  return allocator.PointerIsMine(p);
+  return allocator.PointerIsMineUnsafe(p);
 }
 
 void AllocatorThreadFinish() {

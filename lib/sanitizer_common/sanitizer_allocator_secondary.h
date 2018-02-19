@@ -125,6 +125,10 @@ class LargeMmapAllocator {
     return GetBlockBegin(p) != nullptr;
   }
 
+  bool PointerIsMineUnsafe(const void *p) {
+    return GetBlockBeginUnsafe(p) != nullptr;
+  }
+
   uptr GetActuallyAllocatedSize(void *p) {
     return RoundUpTo(GetHeader(p)->size, page_size_);
   }
@@ -142,6 +146,43 @@ class LargeMmapAllocator {
   void *GetBlockBegin(const void *ptr) {
     uptr p = reinterpret_cast<uptr>(ptr);
     SpinMutexLock l(&mutex_);
+    uptr nearest_chunk = 0;
+    // Cache-friendly linear search.
+    for (uptr i = 0; i < n_chunks_; i++) {
+      uptr ch = reinterpret_cast<uptr>(chunks_[i]);
+      if (p < ch) continue;  // p is at left to this chunk, skip it.
+      if (p - ch < p - nearest_chunk)
+        nearest_chunk = ch;
+    }
+    if (!nearest_chunk)
+      return nullptr;
+    Header *h = reinterpret_cast<Header *>(nearest_chunk);
+    CHECK_GE(nearest_chunk, h->map_beg);
+    CHECK_LT(nearest_chunk, h->map_beg + h->map_size);
+    CHECK_LE(nearest_chunk, p);
+    if (h->map_beg + h->map_size <= p)
+      return nullptr;
+    return GetUser(h);
+  }
+
+  void *GetBlockBeginUnsafe(const void *ptr) {
+    uptr p = reinterpret_cast<uptr>(ptr);
+    // we goin' to da wild wild west
+
+    // unsafe lock free PointerIsMine checking
+    // major assumption: a chunk being accessed will not be deallocated (from any thread) during a mem access,
+    // because the user will have locked. And if they didn't, it's their fault if it crashes. Would have been a race
+    // condition otherwise.
+    // Worst thing that can happen is we access in the middle of a sort of the chunks_ array, we could miss a chunk.
+    // But I doubt the sort is called that often.
+    // On allocation, something is added to the end of chunks_, we will miss that one -- no big deal.
+    // On deallocation, the deallocated index is replaced with index at n_chunks - 1, so we might check
+    // the same thing twice. Depends on semantics of loading n_chunks_.
+    // otherwise we should be safe in the sense that there won't be any illegal mem accesses, but unsafe
+    // in the sense that we may have false negatives
+    // TODO add an option to enable/disable using this, as it trades absolute accuracy for lower overhead
+    
+    //SpinMutexLock l(&mutex_);
     uptr nearest_chunk = 0;
     // Cache-friendly linear search.
     for (uptr i = 0; i < n_chunks_; i++) {

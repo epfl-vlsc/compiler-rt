@@ -147,6 +147,12 @@ class CombinedAllocator {
     return secondary_.PointerIsMine(p);
   }
 
+  bool PointerIsMineUnsafe(void *p) {
+    if (primary_.PointerIsMine(p))
+      return true;
+    return secondary_.PointerIsMineUnsafe(p);
+  }
+
   bool FromPrimary(void *p) {
     return primary_.PointerIsMine(p);
   }
@@ -161,6 +167,12 @@ class CombinedAllocator {
     if (primary_.PointerIsMine(p))
       return primary_.GetBlockBegin(p);
     return secondary_.GetBlockBegin(p);
+  }
+
+  void *GetBlockBeginUnsafe(const void *p) {
+    if (primary_.PointerIsMine(p))
+      return primary_.GetBlockBegin(p);
+    return secondary_.GetBlockBeginUnsafe(p);
   }
 
   // This function does the same as GetBlockBegin, but is much faster.
