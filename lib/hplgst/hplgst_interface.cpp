@@ -1,6 +1,6 @@
 //===-- hplgst_interface.cpp ------------------------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
+//                     The LLVM Compiler Infrastructure 
 //
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
@@ -267,6 +267,9 @@ struct WriterArgs {
 };
 
 static void OnExit () {
+
+  Printf("total hits %d\n", total_hits);
+  Printf("heap hits %d\n", heap_hits);
 
   if (getFlags()->no_output)
     return;
