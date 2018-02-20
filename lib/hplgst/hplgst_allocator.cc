@@ -45,7 +45,7 @@ void* GetBlockBegin(void * p) {
 }
 
 static ChunkMetadata *Metadata(const void *p) {
-  void * p_begin = allocator.GetBlockBegin(p);
+  void * p_begin = allocator.GetBlockBeginUnsafe(p);
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p_begin));
 }
 

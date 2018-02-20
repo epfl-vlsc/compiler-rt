@@ -187,12 +187,6 @@ class LargeMmapAllocator {
     //SpinMutexLock l(&mutex_);
     uptr nearest_chunk = 0;
     if (chunks_sorted_) {
-      auto n = n_chunks_;
-      auto min_mmap_ = reinterpret_cast<uptr>(chunks_[0]);
-      auto max_mmap_ =
-              reinterpret_cast<uptr>(chunks_[n - 1]) + chunks_[n - 1]->map_size;
-      if (p < min_mmap_ || p >= max_mmap_) // early exit case
-        return nullptr;
       int start = 0;
       int end = n_chunks_ - 1;
       int mid;
