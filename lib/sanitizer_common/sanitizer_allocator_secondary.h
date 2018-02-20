@@ -57,20 +57,51 @@ class LargeMmapAllocator {
     CHECK_LT(size_log, ARRAY_SIZE(stats.by_size_log));
     {
       SpinMutexLock l(&mutex_);
-      uptr idx = n_chunks_++;
+
+      CHECK_LT(n_chunks_, kMaxNumChunks);
+      uptr i = n_chunks_ - 1;
+      if (n_chunks_ == 0) {
+        i = 0;
+      } else if (h < chunks_[0]) {
+        i = 0;
+        ShiftRight(i);
+      } else if (h > chunks_[n_chunks_ - 1]) {
+        i = n_chunks_;
+      } else {
+        while (h < chunks_[i])
+          i--;
+        i++;
+        ShiftRight(i);
+      }
+      n_chunks_++;
+      h->chunk_idx = i;
+      chunks_[i] = h;
+      chunks_sorted_ = true;
+      /*uptr idx = n_chunks_++;
       chunks_sorted_ = false;
       CHECK_LT(idx, kMaxNumChunks);
       h->chunk_idx = idx;
-      chunks_[idx] = h;
+      chunks_[idx] = h;*/
       stats.n_allocs++;
       stats.currently_allocated += map_size;
       stats.max_allocated = Max(stats.max_allocated, stats.currently_allocated);
       stats.by_size_log[size_log]++;
       stat->Add(AllocatorStatAllocated, map_size);
       stat->Add(AllocatorStatMapped, map_size);
-      EnsureSortedChunks();
+      //EnsureSortedChunks();
     }
     return reinterpret_cast<void*>(res);
+  }
+
+  void ShiftRight(uptr i) {
+    auto cur = n_chunks_ - 1;
+    while (cur > i) {
+      chunks_[cur+1] = chunks_[cur];
+      chunks_[cur+1]->chunk_idx = cur + 1;
+      cur--;
+    }
+    chunks_[cur+1] = chunks_[cur];
+    chunks_[cur+1]->chunk_idx = cur + 1;
   }
 
   bool MayReturnNull() const {
@@ -91,6 +122,14 @@ class LargeMmapAllocator {
     atomic_store(&may_return_null_, may_return_null, memory_order_release);
   }
 
+  void ShiftLeft(uptr i) {
+    while (i < n_chunks_ - 1)  {
+      chunks_[i] = chunks_[i+1];
+      chunks_[i]->chunk_idx--;
+      i++;
+    }
+  }
+
   void Deallocate(AllocatorStats *stat, void *p) {
     Header *h = GetHeader(p);
     {
@@ -98,10 +137,11 @@ class LargeMmapAllocator {
       uptr idx = h->chunk_idx;
       CHECK_EQ(chunks_[idx], h);
       CHECK_LT(idx, n_chunks_);
-      chunks_[idx] = chunks_[n_chunks_ - 1];
-      chunks_[idx]->chunk_idx = idx;
+      ShiftLeft(idx);
+      /*chunks_[idx] = chunks_[n_chunks_ - 1];
+      chunks_[idx]->chunk_idx = idx;*/
       n_chunks_--;
-      chunks_sorted_ = false;
+      //chunks_sorted_ = false;
       stats.n_frees++;
       stats.currently_allocated -= h->map_size;
       stat->Sub(AllocatorStatAllocated, h->map_size);
