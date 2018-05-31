@@ -1,4 +1,4 @@
-//=-- hplgst.cc -------------------------------------------------------------===//
+//=-- memoro.cc -------------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,33 +7,33 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// Hplgst RTL.
+// Memoro RTL.
 //
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_flag_parser.h"
-#include "hplgst.h"
-#include "hplgst_timer.h"
-#include "hplgst_allocator.h"
-#include "hplgst_thread.h"
+#include "memoro.h"
+#include "memoro_timer.h"
+#include "memoro_allocator.h"
+#include "memoro_thread.h"
 
-namespace __hplgst {
+namespace __memoro {
 
 u64 total_hits = 0;
 u64 heap_hits = 0;
 
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
-/*  VPrintf(3, "in hplgst::%s %p: %c %p %d\n", __FUNCTION__, PC,
+/*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
           IsWrite ? 'w' : 'r', Addr, Size);*/
 
   total_hits++;
   void *p = (void*)Addr;
   if (PointerIsAllocator(p) ) {
     heap_hits++;
-    HplgstMetadata m(Addr);
+    MemoroMetadata m(Addr);
     u64 ts = get_timestamp();
     if (m.first_timestamp() == 0)
       m.set_first_timestamp(ts);
@@ -61,7 +61,7 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   }
 }
 
-}  // namespace __hplgst
+}  // namespace __memoro
 
 
 

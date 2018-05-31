@@ -1,4 +1,4 @@
-//=-- hplgst_common_mac.cc --------------------------------------------------===//
+//=-- memoro_common_mac.cc --------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
 // Implementation of common functionality. Darwin-specific code.
@@ -15,16 +15,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_platform.h"
-#include "hplgst_common.h"
+#include "memoro_common.h"
 
 #if SANITIZER_MAC
 
 #include "sanitizer_common/sanitizer_allocator_internal.h"
-#include "hplgst_allocator.h"
+#include "memoro_allocator.h"
 
 #include <pthread.h>
 
-namespace __hplgst {
+namespace __memoro {
 
 typedef struct {
   int disable_counter;
@@ -93,6 +93,6 @@ LoadedModule *GetLinker() { return nullptr; }
 // required on Darwin.
 void InitializePlatformSpecificModules() {}
 
-} // namespace __hplgst
+} // namespace __memoro
 
 #endif // SANITIZER_MAC

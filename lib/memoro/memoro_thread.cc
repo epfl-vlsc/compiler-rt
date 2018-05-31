@@ -1,4 +1,4 @@
-//=-- hplgst_thread.cc ------------------------------------------------------===//
+//=-- memoro_thread.cc ------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,20 +7,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// See hplgst_thread.h for details.
+// See memoro_thread.h for details.
 //
 //===----------------------------------------------------------------------===//
 
-#include "hplgst_thread.h"
+#include "memoro_thread.h"
 
 #include "sanitizer_common/sanitizer_placement_new.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
-#include "hplgst_allocator.h"
+#include "memoro_allocator.h"
 
-namespace __hplgst {
+namespace __memoro {
 
 static ThreadRegistry *thread_registry;
 static bool initialized;
@@ -39,7 +39,7 @@ void InitializeThreadRegistry() {
     ThreadRegistry(CreateThreadContext, kMaxThreads, kThreadQuarantineSize);
 }
 
-ThreadRegistry &hplgstThreadRegistry() {
+ThreadRegistry &memoroThreadRegistry() {
   return *thread_registry;
 }
 
@@ -156,4 +156,4 @@ void UnlockThreadRegistry() {
   thread_registry->Unlock();
 }
 
-} // namespace __hplgst
+} // namespace __memoro

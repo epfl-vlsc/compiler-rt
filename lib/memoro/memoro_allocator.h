@@ -1,4 +1,4 @@
-//=-- hplgst_allocator.h ----------------------------------------------------===//
+//=-- memoro_allocator.h ----------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,22 +7,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// Allocator for Hplgst.
+// Allocator for Memoro.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef HPLGST_ALLOCATOR_H
-#define HPLGST_ALLOCATOR_H
+#ifndef MEMORO_ALLOCATOR_H
+#define MEMORO_ALLOCATOR_H
 
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
-#include "hplgst_common.h"
+#include "memoro_common.h"
 
-namespace __hplgst {
+namespace __memoro {
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
                bool cleared);
@@ -94,7 +94,7 @@ typedef DefaultSizeClassMap SizeClassMap;
     static const uptr kSpaceBeg = kAllocatorSpace;
     static const uptr kSpaceSize = kAllocatorSize;
     static const uptr kMetadataSize = sizeof(ChunkMetadata);
-    typedef __hplgst::SizeClassMap SizeClassMap;
+    typedef __memoro::SizeClassMap SizeClassMap;
     typedef NoOpMapUnmapCallback MapUnmapCallback;
     static const uptr kFlags = 0;
   };
@@ -131,14 +131,14 @@ typedef CombinedAllocator <PrimaryAllocator, AllocatorCache,
 
 AllocatorCache *GetAllocatorCache();
 
-void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack);
-void *hplgst_malloc(uptr size, const StackTrace &stack);
-void hplgst_free(void *p);
-void *hplgst_realloc(void *p, uptr size, const StackTrace &stack);
-void *hplgst_calloc(uptr nmemb, uptr size, const StackTrace &stack);
-void *hplgst_valloc(uptr size, const StackTrace &stack);
-uptr hplgst_mz_size(const void *p);
+void *memoro_memalign(uptr alignment, uptr size, const StackTrace &stack);
+void *memoro_malloc(uptr size, const StackTrace &stack);
+void memoro_free(void *p);
+void *memoro_realloc(void *p, uptr size, const StackTrace &stack);
+void *memoro_calloc(uptr nmemb, uptr size, const StackTrace &stack);
+void *memoro_valloc(uptr size, const StackTrace &stack);
+uptr memoro_mz_size(const void *p);
 
-}  // namespace __hplgst
+}  // namespace __memoro
 
-#endif  // HPLGST_ALLOCATOR_H
+#endif  // MEMORO_ALLOCATOR_H

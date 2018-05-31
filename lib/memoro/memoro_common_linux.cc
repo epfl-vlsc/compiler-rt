@@ -1,4 +1,4 @@
-//=-- hplgst_common_linux.cc ------------------------------------------------===//
+//=-- memoro_common_linux.cc ------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
 // Implementation of common functionality. Linux-specific code.
@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_platform.h"
-#include "hplgst_common.h"
+#include "memoro_common.h"
 
 #if SANITIZER_LINUX
 
@@ -26,7 +26,7 @@
 #include "sanitizer_common/sanitizer_linux.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
 
-namespace __hplgst {
+namespace __memoro {
 
 static const char kLinkerName[] = "ld";
 
@@ -73,6 +73,6 @@ void InitializePlatformSpecificModules() {
 
 LoadedModule *GetLinker() { return linker; }
 
-} // namespace __hplgst
+} // namespace __memoro
 
 #endif //SANITIZER_LINUX

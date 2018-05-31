@@ -1,4 +1,4 @@
-//=-- hplgst_thread.h -------------------------------------------------------===//
+//=-- memoro_thread.h -------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,15 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// Thread registry for Hplgst.
+// Thread registry for Memoro.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef HPLGST_THREAD_H
-#define HPLGST_THREAD_H
+#ifndef MEMORO_THREAD_H
+#define MEMORO_THREAD_H
 
 #include "sanitizer_common/sanitizer_thread_registry.h"
 
@@ -23,7 +23,7 @@ namespace __sanitizer {
 struct DTLS;
 }
 
-namespace __hplgst {
+namespace __memoro {
 
 using namespace __sanitizer;
 class ThreadContext : public ThreadContextBase {
@@ -48,7 +48,7 @@ class ThreadContext : public ThreadContextBase {
 
 void InitializeThreadRegistry();
 // Returns a single instance of registry.
-ThreadRegistry &hplgstThreadRegistry();
+ThreadRegistry &memoroThreadRegistry();
 
 void ThreadStart(u32 tid, uptr os_id);
 void ThreadFinish();
@@ -60,6 +60,6 @@ u32 GetCurrentThread();
 void SetCurrentThread(u32 tid);
 ThreadContext *CurrentThreadContext();
 void EnsureMainThreadIDIsCorrect();
-}  // namespace __hplgst
+}  // namespace __memoro
 
-#endif  // HPLGST_THREAD_H
+#endif  // MEMORO_THREAD_H

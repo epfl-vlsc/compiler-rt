@@ -2,13 +2,13 @@
 // Created by Stuart Byma on 06.09.17.
 //
 
-#ifndef LLVM_HPLGST_TRACEWRITER_H
-#define LLVM_HPLGST_TRACEWRITER_H
+#ifndef LLVM_MEMORO_TRACEWRITER_H
+#define LLVM_MEMORO_TRACEWRITER_H
 
-#include "hplgst_common.h"
-#include "hplgst_stackdepot.h"
+#include "memoro_common.h"
+#include "memoro_stackdepot.h"
 
-namespace __hplgst {
+namespace __memoro {
 
   class TraceWriter {
   public:
@@ -19,7 +19,7 @@ namespace __hplgst {
     void WriteTrace(const char *trace_string);
     void WriteTrace(const uptr* trace, u32 sz);
 
-    void WriteChunk(HplgstMemoryChunk &chunk, u32 trace_index);
+    void WriteChunk(MemoroMemoryChunk &chunk, u32 trace_index);
 
     // write out the trace and chunk buffers to file
     bool OutputFiles();
@@ -45,4 +45,4 @@ namespace __hplgst {
   };
 
 }
-#endif //LLVM_HPLGST_TRACEWRITER_H
+#endif //LLVM_MEMORO_TRACEWRITER_H

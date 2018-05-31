@@ -1,4 +1,4 @@
-//===-- hplgst_preinit.cc ---------------------------------------------------===//
+//===-- memoro_preinit.cc ---------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,18 +7,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// Call __hplgst_init at the very early stage of process startup.
+// Call __memoro_init at the very early stage of process startup.
 //
 //===----------------------------------------------------------------------===//
 
-#include "hplgst.h"
+#include "memoro.h"
 
 #if SANITIZER_CAN_USE_PREINIT_ARRAY
-  // We force __hplgst_init to be called before anyone else by placing it into
+  // We force __memoro_init to be called before anyone else by placing it into
   // .preinit_array section.
   __attribute__((section(".preinit_array"), used))
-  void (*__local_hplgst_preinit)(ToolType, void*) = __hplgst_init;
+  void (*__local_memoro_preinit)(ToolType, void*) = __memoro_init;
 #endif

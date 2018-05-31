@@ -1,4 +1,4 @@
-//=-- hplgst_linux.cc -------------------------------------------------------===//
+//=-- memoro_linux.cc -------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
 // Linux-specific malloc interception..
@@ -18,9 +18,9 @@
 
 #if SANITIZER_LINUX
 
-#include "hplgst_allocator.h"
+#include "memoro_allocator.h"
 
-namespace __hplgst {
+namespace __memoro {
 
 static THREADLOCAL u32 current_thread_tid = kInvalidTid;
 u32 GetCurrentThread() { return current_thread_tid; }
@@ -31,6 +31,6 @@ AllocatorCache *GetAllocatorCache() { return &allocator_cache; }
 
 void ReplaceSystemMalloc() {}
 
-} // namespace __hplgst
+} // namespace __memoro
 
 #endif // SANITIZER_LINUX

@@ -1,4 +1,4 @@
-//=-- hplgst_flags.cc --------------------------------------------------===//
+//=-- memoro_flags.cc --------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,36 +7,36 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
 //===----------------------------------------------------------------------===////
 
-#include "hplgst_flags.h"
+#include "memoro_flags.h"
 
 using namespace __sanitizer;
 
-namespace __hplgst {
+namespace __memoro {
 
-  static const char HplgstOptsEnv[] = "HPLGST_OPTIONS";
+  static const char MemoroOptsEnv[] = "MEMORO_OPTIONS";
 
-  Flags HplgstFlagsDontUseDirectly;
+  Flags MemoroFlagsDontUseDirectly;
 
   void Flags::setDefaults() {
-#define HPLGST_FLAG(Type, Name, DefaultValue, Description) Name = DefaultValue;
+#define MEMORO_FLAG(Type, Name, DefaultValue, Description) Name = DefaultValue;
 
-#include "hplgst_flags.inc"
+#include "memoro_flags.inc"
 
-#undef HPLGST_FLAG
+#undef MEMORO_FLAG
   }
 
-  static void registerHplgstFlags(FlagParser *Parser, Flags *F) {
-#define HPLGST_FLAG(Type, Name, DefaultValue, Description) \
+  static void registerMemoroFlags(FlagParser *Parser, Flags *F) {
+#define MEMORO_FLAG(Type, Name, DefaultValue, Description) \
   RegisterFlag(Parser, #Name, Description, &F->Name);
 
-#include "hplgst_flags.inc"
+#include "memoro_flags.inc"
 
-#undef HPLGST_FLAG
+#undef MEMORO_FLAG
   }
 
   void InitializeFlags() {
@@ -45,7 +45,7 @@ namespace __hplgst {
     {
       CommonFlags cf;
       cf.CopyFrom(*common_flags());
-      cf.external_symbolizer_path = GetEnv("HPLGST_SYMBOLIZER_PATH");
+      cf.external_symbolizer_path = GetEnv("MEMORO_SYMBOLIZER_PATH");
       // we need large context for mallocs to get unique allocation points
       cf.malloc_context_size = 30;
       cf.intercept_tls_get_addr = true;
@@ -56,9 +56,9 @@ namespace __hplgst {
     F->setDefaults();
 
     FlagParser Parser;
-    registerHplgstFlags(&Parser, F);
+    registerMemoroFlags(&Parser, F);
     RegisterCommonFlags(&Parser);
-    Parser.ParseString(GetEnv(HplgstOptsEnv));
+    Parser.ParseString(GetEnv(MemoroOptsEnv));
 
     InitializeCommonFlags();
     if (Verbosity())

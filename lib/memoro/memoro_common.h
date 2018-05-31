@@ -1,4 +1,4 @@
-//=-- hplgst_common.h -------------------------------------------------------===//
+//=-- memoro_common.h -------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,15 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// Private Hplgst header.
+// Private Memoro header.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef HPLGST_COMMON_H
-#define HPLGST_COMMON_H
+#ifndef MEMORO_COMMON_H
+#define MEMORO_COMMON_H
 
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_common.h"
@@ -29,7 +29,7 @@ class FlagParser;
 struct DTLS;
 }
 
-namespace __hplgst {
+namespace __memoro {
 
 const u32 kInvalidTid = (u32) -1;
 
@@ -48,11 +48,11 @@ enum IgnoreObjectResult {
 };
 
 // Functions called from the parent tool.
-void InitCommonHplgst();
+void InitCommonMemoro();
 void DisableCounterUnderflow();
 bool DisabledInThisThread();
 
-// Used to implement __hplgst::ScopedDisabler.
+// Used to implement __memoro::ScopedDisabler.
 void DisableInThisThread();
 void EnableInThisThread();
 // Can be used to ignore memory allocated by an intercepted
@@ -124,17 +124,17 @@ void EnsureMainThreadIDIsCorrect();
 uptr PointsIntoChunk(void *p);
 // Returns address of user-visible chunk contained in this allocator chunk.
 uptr GetUserBegin(uptr chunk);
-// Helper for __hplgst_ignore_object().
+// Helper for __memoro_ignore_object().
 IgnoreObjectResult IgnoreObjectLocked(const void *p);
 
 // Return the linker module, if valid for the platform.
 LoadedModule *GetLinker();
 
 // Wrapper for chunk metadata operations.
-class HplgstMetadata {
+class MemoroMetadata {
  public:
   // Constructor accepts address of user-visible chunk.
-  explicit HplgstMetadata(uptr chunk);
+  explicit MemoroMetadata(uptr chunk);
   bool allocated() const;
   uptr requested_size() const;
   u8 num_reads() const;
@@ -159,14 +159,14 @@ class HplgstMetadata {
   void *metadata_;
 };
 
-}  // namespace __hplgst
+}  // namespace __memoro
 
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-int __hplgst_is_turned_off();
+int __memoro_is_turned_off();
 
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-const char *__hplgst_default_suppressions();
+const char *__memoro_default_suppressions();
 }  // extern "C"
 
-#endif  // HPLGST_COMMON_H
+#endif  // MEMORO_COMMON_H

@@ -1,4 +1,4 @@
-//=-- hplgst_allocator.cc ---------------------------------------------------===//
+//=-- memoro_allocator.cc ---------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,22 +7,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// See hplgst_allocator.h for details.
+// See memoro_allocator.h for details.
 //
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_allocator_interface.h"
-#include "hplgst_stackdepot.h"
-#include "hplgst_allocator.h"
-#include "hplgst_timer.h"
-#include "hplgst_thread.h"
+#include "memoro_stackdepot.h"
+#include "memoro_allocator.h"
+#include "memoro_timer.h"
+#include "memoro_thread.h"
 
 extern "C" void *memset(void *ptr, int value, uptr num);
 
-namespace __hplgst {
+namespace __memoro {
 
 static Allocator allocator;
 
@@ -54,9 +54,9 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
   // TODO tag with thread id?
-  m->requested_size = size; // This must always be present, or hplgst_mz_size fails (and
+  m->requested_size = size; // This must always be present, or memoro_mz_size fails (and
                             // so does malloc_zone_from_ptr on Mac).
-  HplgstStackDepotHandle handle = HplgstStackDepotPut_WithHandle(stack) ;
+  MemoroStackDepotHandle handle = MemoroStackDepotPut_WithHandle(stack) ;
   m->stack_trace_id = handle.id();
   m->num_reads = 0;
   m->num_writes = 0;
@@ -71,7 +71,7 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 
   m->access_interval_high = 0;
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
   //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
-  //Printf("hplgst allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
+  //Printf("memoro allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
 }
 
 static void RegisterDeallocation(void *p) {
@@ -85,8 +85,8 @@ static void RegisterDeallocation(void *p) {
 
   // store the record of this chunk along with its allocation point stack trace
   // TODO we could also store the free point stack trace?
-  HplgstStackDepotHandle handle = HplgstStackDepotGetHandle(m->stack_trace_id);
-  HplgstMemoryChunk chunk;
+  MemoroStackDepotHandle handle = MemoroStackDepotGetHandle(m->stack_trace_id);
+  MemoroMemoryChunk chunk;
   chunk.allocated = 0;
   chunk.timestamp_start = m->timestamp;
   chunk.timestamp_end = ts;
@@ -108,7 +108,7 @@ void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
   if (size == 0)
     size = 1;
   if (size > kMaxAllowedMallocSize) {
-    Report("WARNING: Hplgst failed to allocate %zu bytes\n", size);
+    Report("WARNING: Memoro failed to allocate %zu bytes\n", size);
     return nullptr;
   }
   void *p = allocator.Allocate(GetAllocatorCache(), size, alignment);
@@ -135,7 +135,7 @@ void *Reallocate(const StackTrace &stack, void *p, uptr new_size,
   u64 ts = get_timestamp();
   RegisterDeallocation(p);
   if (new_size > kMaxAllowedMallocSize) {
-    Report("WARNING: Heapologist failed to allocate %zu bytes\n", new_size);
+    Report("WARNING: Memoro failed to allocate %zu bytes\n", new_size);
     allocator.Deallocate(GetAllocatorCache(), p);
     return nullptr;
   }
@@ -155,34 +155,34 @@ uptr GetMallocUsableSize(const void *p) {
   return m->requested_size;
 }
 
-void *hplgst_memalign(uptr alignment, uptr size, const StackTrace &stack) {
+void *memoro_memalign(uptr alignment, uptr size, const StackTrace &stack) {
   return Allocate(stack, size, alignment, kAlwaysClearMemory);
 }
 
-void *hplgst_malloc(uptr size, const StackTrace &stack) {
+void *memoro_malloc(uptr size, const StackTrace &stack) {
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 }
 
-void hplgst_free(void *p) {
+void memoro_free(void *p) {
   Deallocate(p);
 }
 
-void *hplgst_realloc(void *p, uptr size, const StackTrace &stack) {
+void *memoro_realloc(void *p, uptr size, const StackTrace &stack) {
   return Reallocate(stack, p, size, 1);
 }
 
-void *hplgst_calloc(uptr nmemb, uptr size, const StackTrace &stack) {
+void *memoro_calloc(uptr nmemb, uptr size, const StackTrace &stack) {
   size *= nmemb;
   return Allocate(stack, size, 1, true);
 }
 
-void *hplgst_valloc(uptr size, const StackTrace &stack) {
+void *memoro_valloc(uptr size, const StackTrace &stack) {
   if (size == 0)
     size = GetPageSizeCached();
   return Allocate(stack, size, GetPageSizeCached(), kAlwaysClearMemory);
 }
 
-uptr hplgst_mz_size(const void *p) {
+uptr memoro_mz_size(const void *p) {
   return GetMallocUsableSize(p);
 }
 
@@ -205,77 +205,77 @@ uptr GetUserBegin(uptr chunk) {
   return chunk;
 }
 
-HplgstMetadata::HplgstMetadata(uptr chunk) {
+MemoroMetadata::MemoroMetadata(uptr chunk) {
   metadata_ = Metadata(reinterpret_cast<void *>(chunk));
   //Printf("metadata pointer for %%lld is %lld\n", chunk, metadata_);
   CHECK(metadata_);
 }
 
-bool HplgstMetadata::allocated() const {
+bool MemoroMetadata::allocated() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->allocated;
 }
 
-uptr HplgstMetadata::requested_size() const {
+uptr MemoroMetadata::requested_size() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
 }
 
-u32 HplgstMetadata::stack_trace_id() const {
+u32 MemoroMetadata::stack_trace_id() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
 }
 
-u64 HplgstMetadata::timestamp_start() const {
+u64 MemoroMetadata::timestamp_start() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->timestamp;
 }
 
-void HplgstMetadata::set_latest_timestamp(u64 ts) {
+void MemoroMetadata::set_latest_timestamp(u64 ts) {
   reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp = ts;
 }
 
-void HplgstMetadata::set_first_timestamp(u64 ts) {
+void MemoroMetadata::set_first_timestamp(u64 ts) {
   reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp = ts;
 }
 
-u8 HplgstMetadata::num_reads() const {
+u8 MemoroMetadata::num_reads() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
 }
 
-u8 HplgstMetadata::num_writes() const {
+u8 MemoroMetadata::num_writes() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
 }
 
-void HplgstMetadata::incr_reads() {
+void MemoroMetadata::incr_reads() {
   auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
   if (chunkmeta->num_reads < MAX_READWRITES)
     chunkmeta->num_reads++;
 }
 
-void HplgstMetadata::incr_writes() {
+void MemoroMetadata::incr_writes() {
   auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
   if (chunkmeta->num_writes < MAX_READWRITES)
     chunkmeta->num_writes++;
 }
 
-u64 HplgstMetadata::first_timestamp() {
+u64 MemoroMetadata::first_timestamp() {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp;
 }
 
-u64 HplgstMetadata::latest_timestamp() {
+u64 MemoroMetadata::latest_timestamp() {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp;
 }
 
-u32 HplgstMetadata::creating_thread() {
+u32 MemoroMetadata::creating_thread() {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->creating_thread;
 }
 
-void HplgstMetadata::set_multi_thread() {
+void MemoroMetadata::set_multi_thread() {
   reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread = 1;
 }
 
-u8 HplgstMetadata::multi_thread() const {
+u8 MemoroMetadata::multi_thread() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread;
 }
 
-u64 HplgstMetadata::alloc_call_time() const {
+u64 MemoroMetadata::alloc_call_time() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->alloc_call_time;
 }
 
@@ -283,22 +283,22 @@ void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }
 
-u32 HplgstMetadata::interval_low() const {
+u32 MemoroMetadata::interval_low() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low;
 }
-u32 HplgstMetadata::interval_high() const {
+u32 MemoroMetadata::interval_high() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high;
 }
-void HplgstMetadata::set_interval_low(u32 value) {
+void MemoroMetadata::set_interval_low(u32 value) {
   reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low = value;
 }
-void HplgstMetadata::set_interval_high(u32 value) {
+void MemoroMetadata::set_interval_high(u32 value) {
   reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high = value;
 }
 
-} // namespace __hplgst
+} // namespace __memoro
 
-using namespace __hplgst;
+using namespace __memoro;
 
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE

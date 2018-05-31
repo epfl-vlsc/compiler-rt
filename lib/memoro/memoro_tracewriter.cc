@@ -2,9 +2,9 @@
 // Created by Stuart Byma on 06.09.17.
 //
 
-#include "hplgst_tracewriter.h"
+#include "memoro_tracewriter.h"
 
-namespace __hplgst {
+namespace __memoro {
 
   const u16 MAX_INDEX_SIZE = 1 << 16;
 
@@ -27,10 +27,10 @@ namespace __hplgst {
     chunk_index_length = index_size;
   }
 
-  void TraceWriter::WriteChunk(HplgstMemoryChunk &chunk, u32 trace_index) {
+  void TraceWriter::WriteChunk(MemoroMemoryChunk &chunk, u32 trace_index) {
     //Printf("writing chunk \n");
 
-    RelativeIndex size = static_cast<u16>(sizeof(HplgstMemoryChunk));
+    RelativeIndex size = static_cast<u16>(sizeof(MemoroMemoryChunk));
     if (chunk_index_length - chunk_index_position < sizeof(size)) {
       resize(chunk_index, chunk_index_length); // double
     }
@@ -39,11 +39,11 @@ namespace __hplgst {
     chunk_index_size++;
 
     chunk.stack_index = trace_index;
-    if (chunk_data_length - chunk_data_position < sizeof(HplgstMemoryChunk)) {
+    if (chunk_data_length - chunk_data_position < sizeof(MemoroMemoryChunk)) {
       resize(chunk_data, chunk_data_length); // double
     }
-    internal_memcpy(chunk_data + chunk_data_position, reinterpret_cast<char*>(&chunk), sizeof(HplgstMemoryChunk));
-    chunk_data_position += sizeof(HplgstMemoryChunk);
+    internal_memcpy(chunk_data + chunk_data_position, reinterpret_cast<char*>(&chunk), sizeof(MemoroMemoryChunk));
+    chunk_data_position += sizeof(MemoroMemoryChunk);
 
   }
 
@@ -110,26 +110,26 @@ namespace __hplgst {
     //Printf("Trace file written to --> %s \n", namebuf);
 
     uptr bytes_written, total_written = 0;
-    fd_t hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
-    WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
+    fd_t memoro_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
+    WriteToFile(memoro_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
     total_written += bytes_written;
     if (bytes_written != sizeof(Header)) {
       Printf("write header failed!!");
       return false;
     }
-    WriteToFile(hplgst_outfile, trace_index, trace_index_position, &bytes_written);
+    WriteToFile(memoro_outfile, trace_index, trace_index_position, &bytes_written);
     total_written += bytes_written;
     if (bytes_written != trace_index_position) {
       Printf("write trace index failed!!");
       return false;
     }
-    WriteToFile(hplgst_outfile, trace_data, trace_data_position, &bytes_written);
+    WriteToFile(memoro_outfile, trace_data, trace_data_position, &bytes_written);
     total_written += bytes_written;
     if (bytes_written != trace_data_position) {
       Printf("write trace data failed!!");
       return false;
     }
-    CloseFile(hplgst_outfile);
+    CloseFile(memoro_outfile);
 
     //Printf("total trace: %d \n", total_written);
     total_written = 0;
@@ -138,28 +138,28 @@ namespace __hplgst {
     internal_snprintf(namebuf, 4096, "%s-%d.chunks", GetProcessName(), pid);
     //Printf("Chunks file written to --> %s \n", namebuf);
 
-    hplgst_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
-    WriteToFile(hplgst_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
+    memoro_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
+    WriteToFile(memoro_outfile, reinterpret_cast<char*>(&header), sizeof(Header), &bytes_written);
     total_written += bytes_written;
     if (bytes_written != sizeof(Header)) {
       Printf("write chunk header failed!!");
       return false;
     }
     //Printf("writing %d bytes to file\n", chunk_index_position);
-    WriteToFile(hplgst_outfile, chunk_index, chunk_index_position, &bytes_written);
+    WriteToFile(memoro_outfile, chunk_index, chunk_index_position, &bytes_written);
     total_written += bytes_written;
     if (bytes_written != chunk_index_position) {
       Printf("write chunk index failed!!");
       return false;
     }
     //Printf("writing %d bytes to file\n", chunk_data_position);
-    WriteToFile(hplgst_outfile, chunk_data, chunk_data_position, &bytes_written);
+    WriteToFile(memoro_outfile, chunk_data, chunk_data_position, &bytes_written);
     total_written += bytes_written;
     if (bytes_written != chunk_data_position) {
       Printf("write chunk data failed!!");
       return false;
     }
-    CloseFile(hplgst_outfile);
+    CloseFile(memoro_outfile);
 
     // for some reason, almost a megabyte of zeroes gets tacked onto the end of the file :-/
 /*    Printf("total chunk: %d \n", total_written);

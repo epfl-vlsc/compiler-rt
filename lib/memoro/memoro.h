@@ -1,4 +1,4 @@
-//=-- hplgst.h --------------------------------------------------------------===//
+//=-- memoro.h --------------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,16 +7,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
-// Private header for Hplgst RTL.
+// Private header for Memoro RTL.
 //
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
-#include "hplgst_interface_internal.h"
+#include "memoro_interface_internal.h"
 
 #define GET_STACK_TRACE(max_size, fast)                                        \
   BufferedStackTrace stack;                                                    \
@@ -41,7 +41,7 @@
   GET_STACK_TRACE(common_flags()->malloc_context_size, \
                   common_flags()->fast_unwind_on_malloc)
 
-namespace __hplgst {
+namespace __memoro {
 
 void InitializeInterceptors();
 
@@ -49,15 +49,15 @@ void ReplaceSystemMalloc();
 
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
 
-#define ENSURE_HPLGST_INITED() do {   \
-  CHECK(!hplgst_init_is_running);   \
-  if (!hplgst_inited)               \
-    __hplgst_init((ToolType)0, nullptr);                \
+#define ENSURE_MEMORO_INITED() do {   \
+  CHECK(!memoro_init_is_running);   \
+  if (!memoro_inited)               \
+    __memoro_init((ToolType)0, nullptr);                \
 } while (0)
 
   extern u64 total_hits;
   extern u64 heap_hits;
-}  // namespace __hplgst
+}  // namespace __memoro
 
-extern bool hplgst_inited;
-extern bool hplgst_init_is_running;
+extern bool memoro_inited;
+extern bool memoro_init_is_running;

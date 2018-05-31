@@ -1,4 +1,4 @@
-//=-- hplgst_timer.h -------------------------------------------------------===//
+//=-- memoro_timer.h -------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,14 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
 // Code for 64 bit nanosecond timestamps.
 //
 //===----------------------------------------------------------------------===//
 
-#include "hplgst_timer.h"
+#include "memoro_timer.h"
 
 
 #if SANITIZER_LINUX
@@ -23,7 +23,7 @@
 #include <x86intrin.h>
 #endif
 
-namespace __hplgst {
+namespace __memoro {
 
   u64 get_timestamp() {
     // before you get all uppity on me, recall that

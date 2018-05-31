@@ -1,4 +1,4 @@
-//=-- hplgst_flags.h --------------------------------------------------===//
+//=-- memoro_flags.h --------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,39 +7,39 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is a part of Heapologist.
+// This file is a part of Memoro.
 // Stuart Byma, EPFL.
 //
 //===----------------------------------------------------------------------===////
 
 
-#ifndef LLVM_HPLGST_FLAGS_H
-#define LLVM_HPLGST_FLAGS_H
+#ifndef LLVM_MEMORO_FLAGS_H
+#define LLVM_MEMORO_FLAGS_H
 
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_flag_parser.h"
 
-namespace __hplgst {
+namespace __memoro {
 
   class Flags {
   public:
-#define HPLGST_FLAG(Type, Name, DefaultValue, Description) Type Name;
+#define MEMORO_FLAG(Type, Name, DefaultValue, Description) Type Name;
 
-#include "hplgst_flags.inc"
+#include "memoro_flags.inc"
 
-#undef HPLGST_FLAG
+#undef MEMORO_FLAG
 
     void setDefaults();
   };
 
-  extern Flags HplgstFlagsDontUseDirectly;
+  extern Flags MemoroFlagsDontUseDirectly;
 
   inline Flags *getFlags() {
-    return &HplgstFlagsDontUseDirectly;
+    return &MemoroFlagsDontUseDirectly;
   }
 
   void InitializeFlags();
 
-} // namespace __hplgst
+} // namespace __memoro
 
-#endif //LLVM_HPLGST_FLAGS_H
+#endif //LLVM_MEMORO_FLAGS_H

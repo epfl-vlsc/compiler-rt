@@ -1,4 +1,4 @@
-//===-- hplgst_stackdepot.h ----------------------------------*- C++ -*-===//
+//===-- memoro_stackdepot.h ----------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,27 +7,27 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Custom stack depot for heapologist.
+// Custom stack depot for Memoro.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef HPLGST_STACKDEPOT_H
-#define HPLGST_STACKDEPOT_H
+#ifndef MEMORO_STACKDEPOT_H
+#define MEMORO_STACKDEPOT_H
 
 #include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
 
-namespace __hplgst {
+namespace __memoro {
 
   // this structure must be kept consistent with the Chunk struct in
   // the visualizer C++ library, because it is written in binary form to disk
-struct __attribute__((packed)) HplgstMemoryChunk {
-  HplgstMemoryChunk(u8 n_reads, u8 n_writes, u8 allocd,
+struct __attribute__((packed)) MemoroMemoryChunk {
+  MemoroMemoryChunk(u8 n_reads, u8 n_writes, u8 allocd,
                     u64 sz, u64 ts_start, u64 ts_end) : num_reads(n_reads), num_writes(n_writes),
                                                         allocated(allocd), size(sz),
                                                         timestamp_start(ts_start), timestamp_end(ts_end) {}
-  HplgstMemoryChunk() {}
+  MemoroMemoryChunk() {}
   u8 num_reads = 0;
   u8 num_writes = 0;
   u8 allocated = 0;
@@ -42,11 +42,11 @@ struct __attribute__((packed)) HplgstMemoryChunk {
   // these are essentially byte indexes representing the interval that all accesses fell into
   u32 access_interval_low = 0;
   u32 access_interval_high = 0;
-  static bool ChunkComparator(const HplgstMemoryChunk &a, const HplgstMemoryChunk &b);
+  static bool ChunkComparator(const MemoroMemoryChunk &a, const MemoroMemoryChunk &b);
 };
 
 
-typedef void (*ForEachMemChunkCb) (HplgstMemoryChunk& chunk, void* arg);
+typedef void (*ForEachMemChunkCb) (MemoroMemoryChunk& chunk, void* arg);
 
 enum Inefficiency : u64 {
   Unused = 0x1,
@@ -60,18 +60,18 @@ enum Inefficiency : u64 {
 };
 
 // StackDepot efficiently stores huge amounts of stack traces.
-struct HplgstStackDepotNode;
-struct HplgstStackDepotHandle {
-  HplgstStackDepotNode *node_;
+struct MemoroStackDepotNode;
+struct MemoroStackDepotHandle {
+  MemoroStackDepotNode *node_;
   StaticSpinMutex mu_;
-  HplgstStackDepotHandle() : node_(nullptr) {}
-  explicit HplgstStackDepotHandle(HplgstStackDepotNode *node) : node_(node) {}
+  MemoroStackDepotHandle() : node_(nullptr) {}
+  explicit MemoroStackDepotHandle(MemoroStackDepotNode *node) : node_(node) {}
   bool valid() { return node_; }
   u32 id();
   int use_count();
   void inc_use_count_unsafe();
   StackTrace trace();
-  void new_chunk(HplgstMemoryChunk& newChunk);
+  void new_chunk(MemoroMemoryChunk& newChunk);
   void ForEachChunk(ForEachMemChunkCb func, void* arg);
   bool TraceHasMain();
   bool TraceHasUnknown();
@@ -79,27 +79,27 @@ struct HplgstStackDepotHandle {
   void add_inefficiency(Inefficiency i);
   bool has_inefficiency(Inefficiency i);
   bool has_inefficiencies();
-  static bool ChunkNumComparator(const HplgstStackDepotHandle &a,
-                                 const HplgstStackDepotHandle &b);
+  static bool ChunkNumComparator(const MemoroStackDepotHandle &a,
+                                 const MemoroStackDepotHandle &b);
 };
 
 
-typedef void (*ForEachStackTraceCb) (HplgstStackDepotHandle& handle, void* arg);
+typedef void (*ForEachStackTraceCb) (MemoroStackDepotHandle& handle, void* arg);
 const int kStackDepotMaxUseCount = 1U << 20;
 
 StackDepotStats *StackDepotGetStats();
-HplgstStackDepotHandle HplgstStackDepotPut_WithHandle(StackTrace stack);
-HplgstStackDepotHandle HplgstStackDepotGetHandle(u32 id);
-void HplgstStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg);
-void HplgstStackDepot_SortAllChunkVectors();
+MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack);
+MemoroStackDepotHandle MemoroStackDepotGetHandle(u32 id);
+void MemoroStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg);
+void MemoroStackDepot_SortAllChunkVectors();
 
 // Retrieves a stored stack trace by the id.
 //StackAndChunks StackDepotGet(u32 id);
 
-void HplgstStackDepotLockAll();
-void HplgstStackDepotUnlockAll();
+void MemoroStackDepotLockAll();
+void MemoroStackDepotUnlockAll();
 
 
-} // namespace __hplgst
+} // namespace __memoro
 
-#endif // HPLGST_STACKDEPOT_H
+#endif // MEMORO_STACKDEPOT_H

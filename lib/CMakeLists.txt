@@ -46,7 +46,7 @@ if(COMPILER_RT_BUILD_SANITIZERS)
   endif()
 
   compiler_rt_build_sanitizer(asan)
-  compiler_rt_build_sanitizer(hplgst)
+  compiler_rt_build_sanitizer(memoro)
   compiler_rt_build_sanitizer(dfsan)
   compiler_rt_build_sanitizer(msan)
   compiler_rt_build_sanitizer(tsan tsan/dd)

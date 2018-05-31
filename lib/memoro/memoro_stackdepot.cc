@@ -11,23 +11,23 @@
 // run-time libraries.
 //===----------------------------------------------------------------------===//
 
-#include "hplgst_stackdepot.h"
+#include "memoro_stackdepot.h"
 
 #include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_stackdepotbase.h"
 #include "sanitizer_common/sanitizer_symbolizer.h"
 
-namespace __hplgst {
+namespace __memoro {
 
-typedef InternalMmapVectorNoCtor<HplgstMemoryChunk> ChunkVec;
+typedef InternalMmapVectorNoCtor<MemoroMemoryChunk> ChunkVec;
 
-struct HplgstStackDepotNode {
-  HplgstStackDepotNode *link;
+struct MemoroStackDepotNode {
+  MemoroStackDepotNode *link;
   u32 id;
   atomic_uint32_t hash_and_use_count; // hash_bits : 12; use_count : 20;
   u32 size;
   u32 tag;
-  // hplgst stats
+  // memoro stats
   ChunkVec* chunk_vec = nullptr;
   u64 inefficiencies = 0; // bit vector of Inefficiency enum
   uptr stack[1];  // [size]
@@ -54,7 +54,7 @@ struct HplgstStackDepotNode {
     return true;
   }
   static uptr storage_size(const args_type &args) {
-    return sizeof(HplgstStackDepotNode) + (args.size - 1) * sizeof(uptr);
+    return sizeof(MemoroStackDepotNode) + (args.size - 1) * sizeof(uptr);
   }
   static u32 hash(const args_type &args) {
     // murmur2
@@ -91,42 +91,42 @@ struct HplgstStackDepotNode {
   args_type load() const {
     return args_type(&stack[0], size, tag);
   }
-  HplgstStackDepotHandle get_handle() { return HplgstStackDepotHandle(this); }
+  MemoroStackDepotHandle get_handle() { return MemoroStackDepotHandle(this); }
 
-  typedef HplgstStackDepotHandle handle_type;
+  typedef MemoroStackDepotHandle handle_type;
 };
 
-COMPILER_CHECK(HplgstStackDepotNode::kMaxUseCount == (u32)kStackDepotMaxUseCount);
+COMPILER_CHECK(MemoroStackDepotNode::kMaxUseCount == (u32)kStackDepotMaxUseCount);
 
-u32 HplgstStackDepotHandle::id() { return node_->id; }
+u32 MemoroStackDepotHandle::id() { return node_->id; }
 
-int HplgstStackDepotHandle::use_count() {
+int MemoroStackDepotHandle::use_count() {
   return atomic_load(&node_->hash_and_use_count, memory_order_relaxed) &
-         HplgstStackDepotNode::kUseCountMask;
+         MemoroStackDepotNode::kUseCountMask;
 }
 
-void HplgstStackDepotHandle::inc_use_count_unsafe() {
+void MemoroStackDepotHandle::inc_use_count_unsafe() {
   u32 prev =
       atomic_fetch_add(&node_->hash_and_use_count, 1, memory_order_relaxed) &
-      HplgstStackDepotNode::kUseCountMask;
-  CHECK_LT(prev + 1, HplgstStackDepotNode::kMaxUseCount);
+      MemoroStackDepotNode::kUseCountMask;
+  CHECK_LT(prev + 1, MemoroStackDepotNode::kMaxUseCount);
 }
 
-StackTrace HplgstStackDepotHandle::trace() {
+StackTrace MemoroStackDepotHandle::trace() {
   return StackTrace(&node_->stack[0], node_->size, node_->tag);
 }
 
-void HplgstStackDepotHandle::new_chunk(HplgstMemoryChunk& newChunk) {
+void MemoroStackDepotHandle::new_chunk(MemoroMemoryChunk& newChunk) {
   ChunkVec* vec = node_->chunk_vec;
   //SpinMutexLock l(&mu_); // multiple threads can free chunks at the same time, we need to sync
   vec->push_back(newChunk);
 }
 
-uptr HplgstStackDepotHandle::total_chunks() const {
+uptr MemoroStackDepotHandle::total_chunks() const {
   return node_->chunk_vec->size();
 }
 
-void HplgstStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
+void MemoroStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
   auto vec = node_->chunk_vec;
   //Printf("handle has %d chunks\n", vec->size());
   for (uptr i = 0; i < vec->size(); i++) {
@@ -134,64 +134,64 @@ void HplgstStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
   }
 }
 
-void HplgstStackDepotHandle::add_inefficiency(Inefficiency i) {
+void MemoroStackDepotHandle::add_inefficiency(Inefficiency i) {
   node_->inefficiencies |= i;
 }
 
-bool HplgstStackDepotHandle::has_inefficiency(Inefficiency i) {
+bool MemoroStackDepotHandle::has_inefficiency(Inefficiency i) {
   return node_->inefficiencies & i;
 }
 
-bool HplgstStackDepotHandle::has_inefficiencies() {
+bool MemoroStackDepotHandle::has_inefficiencies() {
   return node_->inefficiencies != 0;
 }
 
-bool HplgstStackDepotHandle::ChunkNumComparator(const HplgstStackDepotHandle &a, const HplgstStackDepotHandle &b) {
+bool MemoroStackDepotHandle::ChunkNumComparator(const MemoroStackDepotHandle &a, const MemoroStackDepotHandle &b) {
   return a.total_chunks() < b.total_chunks();
 }
 
 
 // FIXME(dvyukov): this single reserved bit is used in TSan.
-typedef StackDepotBase<HplgstStackDepotNode, 1, HplgstStackDepotNode::kTabSizeLog>
-    HplgstStackDepot;
-static HplgstStackDepot theDepot;
+typedef StackDepotBase<MemoroStackDepotNode, 1, MemoroStackDepotNode::kTabSizeLog>
+    MemoroStackDepot;
+static MemoroStackDepot theDepot;
 
 StackDepotStats *StackDepotGetStats() {
   return theDepot.GetStats();
 }
 
-HplgstStackDepotHandle HplgstStackDepotPut_WithHandle(StackTrace stack) {
+MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack) {
   return theDepot.Put(stack);
 }
 
-HplgstStackDepotHandle HplgstStackDepotGetHandle(u32 id) {
+MemoroStackDepotHandle MemoroStackDepotGetHandle(u32 id) {
   return theDepot.GetHandle(id);
 }
 
-void HplgstStackDepotLockAll() {
+void MemoroStackDepotLockAll() {
   theDepot.LockAll();
 }
 
-void HplgstStackDepotUnlockAll() {
+void MemoroStackDepotUnlockAll() {
   theDepot.UnlockAll();
 }
 
-void HplgstStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg) {
+void MemoroStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg) {
   theDepot.ForEach(func, arg);
 }
 
 
-bool HplgstMemoryChunk::ChunkComparator(const HplgstMemoryChunk& a, const HplgstMemoryChunk& b) {
+bool MemoroMemoryChunk::ChunkComparator(const MemoroMemoryChunk& a, const MemoroMemoryChunk& b) {
   return a.timestamp_start < b.timestamp_start;
 }
 
-void SortCb(HplgstStackDepotHandle& handle, void* arg) {
+void SortCb(MemoroStackDepotHandle& handle, void* arg) {
   InternalSort(handle.node_->chunk_vec, handle.node_->chunk_vec->size(),
-  HplgstMemoryChunk::ChunkComparator);
+  MemoroMemoryChunk::ChunkComparator);
 }
 
-void HplgstStackDepot_SortAllChunkVectors() {
-  HplgstStackDepot_ForEachStackTrace(SortCb, nullptr);
+void MemoroStackDepot_SortAllChunkVectors() {
+  MemoroStackDepot_ForEachStackTrace(SortCb, nullptr);
 }
 
-} // namespace __hplgst
+} // namespace __memoro
