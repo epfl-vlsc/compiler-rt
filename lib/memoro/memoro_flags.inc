@@ -22,6 +22,8 @@
 // See COMMON_FLAG in sanitizer_flags.inc for more details.
 
 
+// bunch of these are probably not needed anymore as the runtime does no
+// analysis anymore
 MEMORO_FLAG(int, short_lifetime, 1000000, "Short lifetime detection threshold in nanoseconds [1M ns]")
 MEMORO_FLAG(int, realloc_min_run, 4, "Minimum number of increasing allocation size to flag [4]")
 MEMORO_FLAG(

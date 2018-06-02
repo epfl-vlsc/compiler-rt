@@ -1,3 +1,6 @@
+
+This is a fork of Compiler-RT for development of [Memoro](https://github.com/epfl-vlsc/memoro) static instrumentation. 
+
 Compiler-RT
 ================================
 
