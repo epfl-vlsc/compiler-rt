@@ -89,7 +89,7 @@ static void RegisterDeallocation(void *p) {
 
   // store the record of this chunk along with its allocation point stack trace
   // TODO we could also store the free point stack trace?
-  MemoroStackDepotHandle handle = MemoroStackDepotGetHandle(m->stack_trace_id);
+  MemoroStackAndChunks sl = MemoroStackDepotGet(m->stack_trace_id);
   MemoroMemoryChunk chunk;
   chunk.allocated = 0;
   chunk.timestamp_start = m->timestamp;
@@ -103,7 +103,7 @@ static void RegisterDeallocation(void *p) {
   chunk.multi_thread = m->multi_thread;
   chunk.access_interval_low = m->access_interval_low;
   chunk.access_interval_high = m->access_interval_high;
-  handle.new_chunk(chunk);
+  sl.chunks->push_back(chunk);
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,

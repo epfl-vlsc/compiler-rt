@@ -14,6 +14,8 @@
 #ifndef MEMORO_STACKDEPOT_H
 #define MEMORO_STACKDEPOT_H
 
+#include <utility>
+
 #include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
@@ -45,6 +47,15 @@ struct __attribute__((packed)) MemoroMemoryChunk {
   static bool ChunkComparator(const MemoroMemoryChunk &a, const MemoroMemoryChunk &b);
 };
 
+typedef InternalMmapVectorNoCtor<MemoroMemoryChunk> ChunkVec;
+struct MemoroStackAndChunks {
+    StackTrace st;
+    ChunkVec *chunks;
+
+    MemoroStackAndChunks() : chunks(nullptr) {}
+    MemoroStackAndChunks(const StackTrace& _st) : st(_st), chunks(nullptr) {}
+    MemoroStackAndChunks(const StackTrace& _st, ChunkVec* _chunks) : st(_st), chunks(_chunks) {}
+};
 
 typedef void (*ForEachMemChunkCb) (MemoroMemoryChunk& chunk, void* arg);
 
@@ -84,12 +95,12 @@ struct MemoroStackDepotHandle {
 };
 
 
-typedef void (*ForEachStackTraceCb) (MemoroStackDepotHandle& handle, void* arg);
+typedef void (*ForEachStackTraceCb) (const MemoroStackAndChunks& handle, void* arg);
 const int kStackDepotMaxUseCount = 1U << 20;
 
 StackDepotStats *StackDepotGetStats();
 MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack);
-MemoroStackDepotHandle MemoroStackDepotGetHandle(u32 id);
+MemoroStackAndChunks MemoroStackDepotGet(u32 id);
 void MemoroStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg);
 void MemoroStackDepot_SortAllChunkVectors();
 

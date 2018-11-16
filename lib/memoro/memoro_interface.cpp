@@ -37,7 +37,7 @@ void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
   //Printf("lifetime: %lld \n", m.latest_timestamp() - m.timestamp_start());
   if (m.allocated()) {
     //Printf("ptr %llx, meta %llx, allocated %llu, req size %x, trace id %x \n", chunk, m.metadata_, m.allocated(), m.requested_size(), m.stack_trace_id());
-    MemoroStackDepotHandle handle = MemoroStackDepotGetHandle(m.stack_trace_id());
+    MemoroStackAndChunks sl = MemoroStackDepotGet(m.stack_trace_id());
     MemoroMemoryChunk newchunk;
     newchunk.allocated = 1;
     newchunk.timestamp_start = m.timestamp_start();
@@ -51,7 +51,7 @@ void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
     newchunk.multi_thread = m.multi_thread();
     newchunk.access_interval_low = m.interval_low();
     newchunk.access_interval_high = m.interval_high();
-    handle.new_chunk(newchunk);
+    sl.chunks->push_back(newchunk);
   }
 }
 
@@ -194,20 +194,19 @@ void FindShortLifetimeAllocs(MemoroStackDepotHandle& handle, void* arg) {
 
 }
 
-// a ForEachStackTrace callback
-void TallyAllocationPoint(MemoroStackDepotHandle& handle, void* arg) {
+void TallyAllocationPoint(const MemoroStackAndChunks& sc, void* arg) {
 
   // Currently flags an allocation point that produces *any* short
   // lived chunks
 
   // don't include stack traces that don't originate from main()
   // TODO do this once and filter them up front
-  /*if (handle.TraceHasUnknown()) {
+  /*if (sc.st.TraceHasUnknown()) {
     return;
   }*/
 
-  auto vec = (InternalMmapVector<MemoroStackDepotHandle>*) arg;
-  vec->push_back(handle);
+  auto vec = (InternalMmapVector<MemoroStackAndChunks>*) arg;
+  vec->push_back(sc);
 
 }
 
@@ -261,11 +260,6 @@ void PrintCollectedStats(MemoroStackDepotHandle& handle, void* arg) {
   }
 }
 
-struct WriterArgs {
-  TraceWriter* writer = nullptr;
-  __sanitizer::u32 stack_id = 0;
-};
-
 static void OnExit () {
 
   //Printf("total hits %d\n", total_hits);
@@ -291,16 +285,9 @@ static void OnExit () {
   // making a copy of stack trace handles, pointed-to data
   // is not duplicated
   // most things in this entire function could be optimized
-  InternalMmapVector<MemoroStackDepotHandle> all_alloc_points;
+  InternalMmapVector<MemoroStackAndChunks> all_alloc_points;
   MemoroStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
   //Printf("Program has %d active allocation points this run\n", all_alloc_points.size());
-  // sort to calculate percentile
-  Sort(all_alloc_points.data(), all_alloc_points.size(), MemoroStackDepotHandle::ChunkNumComparator);
-  float percentile = (float) getFlags()->percentile / 100.0f;
-  int index = int(percentile * all_alloc_points.size());
-  for (int i = index; i < all_alloc_points.size(); i++) {
-    all_alloc_points[i].add_inefficiency(Inefficiency::TopPercentile);
-  }
 
 
   // write all alloc points and chunks to file
@@ -308,18 +295,16 @@ static void OnExit () {
   const __sanitizer::uptr buflen = 1024*1024;
   char buf[buflen];  // 1MB because i dont care
   TraceWriter writer(1024, 1024*1024);
-  WriterArgs args;
-  args.writer = &writer;
 
-  for (int i = 0; i < all_alloc_points.size(); i++) {
-    auto& alloc_point = all_alloc_points[i];
-    alloc_point.trace().SPrint(buf, buflen, "#%n %p %F %L|");
+  for (uptr i = 0; i < all_alloc_points.size(); i++) {
+    const MemoroStackAndChunks& alloc_point = all_alloc_points[i];
+    alloc_point.st.SPrint(buf, buflen, "#%n %p %F %L|");
 
     writer.WriteTrace(buf);
     //writer.WriteTrace(alloc_point.trace().trace, alloc_point.trace().size);
-    args.stack_id = (__sanitizer::u32)i;
 
-    alloc_point.ForEachChunk([](MemoroMemoryChunk& chunk, void * arg){
+    for (uptr j = 0; j < alloc_point.chunks->size(); j++) {
+      MemoroMemoryChunk &chunk = (*alloc_point.chunks)[j];
       chunk.timestamp_start = chunk.timestamp_start - memoro_start;
       chunk.timestamp_end = chunk.timestamp_end - memoro_start;
       chunk.timestamp_first_access = chunk.timestamp_first_access > 0 ?
@@ -330,11 +315,9 @@ static void OnExit () {
         Printf("WARNING: chunk had access interval larger than size\n");
 
       //Printf("interval high %d\n", chunk.access_interval_low);
-      WriterArgs* args = (WriterArgs*)arg;
-      args->writer->WriteChunk(chunk, args->stack_id);
+      writer.WriteChunk(chunk, i);
 
-    }, &args);
-
+    }
   }
 
   if (!writer.OutputFiles())

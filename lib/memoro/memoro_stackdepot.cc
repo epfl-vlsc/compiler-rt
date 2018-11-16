@@ -10,7 +10,6 @@
 // This file is shared between AddressSanitizer and ThreadSanitizer
 // run-time libraries.
 //===----------------------------------------------------------------------===//
-
 #include "memoro_stackdepot.h"
 
 #include "sanitizer_common/sanitizer_common.h"
@@ -18,8 +17,6 @@
 #include "sanitizer_common/sanitizer_symbolizer.h"
 
 namespace __memoro {
-
-typedef InternalMmapVectorNoCtor<MemoroMemoryChunk> ChunkVec;
 
 struct MemoroStackDepotNode {
   MemoroStackDepotNode *link;
@@ -41,29 +38,31 @@ struct MemoroStackDepotNode {
   static const u32 kUseCountMask = (1 << kUseCountBits) - 1;
   static const u32 kHashMask = ~kUseCountMask;
 
-  typedef StackTrace args_type;
+  typedef MemoroStackAndChunks args_type;
   bool eq(u32 hash, const args_type &args) const {
+    const StackTrace &st = args.st;
     u32 hash_bits =
         atomic_load(&hash_and_use_count, memory_order_relaxed) & kHashMask;
-    if ((hash & kHashMask) != hash_bits || args.size != size || args.tag != tag)
+    if ((hash & kHashMask) != hash_bits || st.size != size || st.tag != tag)
       return false;
     uptr i = 0;
     for (; i < size; i++) {
-      if (stack[i] != args.trace[i]) return false;
+      if (stack[i] != st.trace[i]) return false;
     }
     return true;
   }
   static uptr storage_size(const args_type &args) {
-    return sizeof(MemoroStackDepotNode) + (args.size - 1) * sizeof(uptr);
+    return sizeof(MemoroStackDepotNode) + (args.st.size - 1) * sizeof(uptr);
   }
   static u32 hash(const args_type &args) {
     // murmur2
+    const StackTrace &st = args.st;
     const u32 m = 0x5bd1e995;
     const u32 seed = 0x9747b28c;
     const u32 r = 24;
-    u32 h = seed ^ (args.size * sizeof(uptr));
-    for (uptr i = 0; i < args.size; i++) {
-      u32 k = args.trace[i];
+    u32 h = seed ^ (st.size * sizeof(uptr));
+    for (uptr i = 0; i < st.size; i++) {
+      u32 k = st.trace[i];
       k *= m;
       k ^= k >> r;
       k *= m;
@@ -76,20 +75,21 @@ struct MemoroStackDepotNode {
     return h;
   }
   static bool is_valid(const args_type &args) {
-    return args.size > 0 && args.trace;
+    return args.st.size > 0 && args.st.trace;
   }
   void store(const args_type &args, u32 hash) {
     // afaict this only gets called a new entry is created so alloc is safe here
     atomic_store(&hash_and_use_count, hash & kHashMask, memory_order_relaxed);
-    size = args.size;
-    tag = args.tag;
+    const StackTrace &st = args.st;
+    size = st.size;
+    tag = st.tag;
     CHECK_EQ(chunk_vec, nullptr);
     chunk_vec = reinterpret_cast<decltype(chunk_vec)>(PersistentAlloc(sizeof(ChunkVec)));
     chunk_vec->Initialize(128); // hopefully not too big? or too small?
-    internal_memcpy(stack, args.trace, size * sizeof(uptr));
+    internal_memcpy(stack, st.trace, size * sizeof(uptr));
   }
   args_type load() const {
-    return args_type(&stack[0], size, tag);
+    return args_type(StackTrace(&stack[0], size, tag), chunk_vec);
   }
   MemoroStackDepotHandle get_handle() { return MemoroStackDepotHandle(this); }
 
@@ -152,11 +152,11 @@ bool MemoroStackDepotHandle::ChunkNumComparator(const MemoroStackDepotHandle &a,
 
 
 // FIXME(dvyukov): this single reserved bit is used in TSan.
-typedef InternalMmapVectorNoCtor<MemoroStackDepotHandle> MemoroStackDepotHandleVec;
+typedef InternalMmapVectorNoCtor<u32> MemoroStackDepotIndexes;
 typedef StackDepotBase<MemoroStackDepotNode, 1, MemoroStackDepotNode::kTabSizeLog>
     MemoroStackDepot;
 static MemoroStackDepot theDepot;
-static MemoroStackDepotHandleVec theDepotHandles;
+static MemoroStackDepotIndexes theDepotIndexes;
 
 StackDepotStats *StackDepotGetStats() {
   return theDepot.GetStats();
@@ -164,14 +164,13 @@ StackDepotStats *StackDepotGetStats() {
 
 MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack) {
   bool inserted = false;
-  MemoroStackDepotHandle theHandle = theDepot.Put(stack, &inserted);
-  if (inserted) theDepotHandles.push_back(theHandle);
+  MemoroStackDepotHandle theHandle = theDepot.Put(MemoroStackAndChunks(stack), &inserted);
+  if (inserted) theDepotIndexes.push_back(theHandle.id());
   return theHandle;
 }
 
-MemoroStackDepotHandle MemoroStackDepotGetHandle(u32 id) {
-  // FIXME: This is very wrong!
-  return theDepot.Put(theDepot.Get(id));
+MemoroStackAndChunks MemoroStackDepotGet(u32 id) {
+  return theDepot.Get(id);
 }
 
 void MemoroStackDepotLockAll() {
@@ -183,8 +182,8 @@ void MemoroStackDepotUnlockAll() {
 }
 
 void MemoroStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg) {
-  for (MemoroStackDepotHandle handle : theDepotHandles)
-    func(handle, arg);
+  for (u32 id : theDepotIndexes)
+    func(theDepot.Get(id), arg);
 }
 
 
@@ -192,8 +191,8 @@ bool MemoroMemoryChunk::ChunkComparator(const MemoroMemoryChunk& a, const Memoro
   return a.timestamp_start < b.timestamp_start;
 }
 
-void SortCb(MemoroStackDepotHandle& handle, void* arg) {
-  Sort(handle.node_->chunk_vec->data(), handle.node_->chunk_vec->size(),
+void SortCb(const MemoroStackAndChunks& _n, void* arg) {
+  Sort(_n.chunks->data(), _n.chunks->size(),
   MemoroMemoryChunk::ChunkComparator);
 }
 
