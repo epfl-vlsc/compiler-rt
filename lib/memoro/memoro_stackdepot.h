@@ -57,55 +57,25 @@ struct MemoroStackAndChunks {
     MemoroStackAndChunks(const StackTrace& _st, ChunkVec* _chunks) : st(_st), chunks(_chunks) {}
 };
 
-typedef void (*ForEachMemChunkCb) (MemoroMemoryChunk& chunk, void* arg);
-
-enum Inefficiency : u64 {
-  Unused = 0x1,
-  WriteOnly = 1 << 1,
-  ReadOnly = 1 << 2,
-  ShortLifetime = 1 << 3,
-  LateFree = 1 << 4,
-  EarlyAlloc =  1 << 5,
-  IncreasingReallocs = 1 << 6,
-  TopPercentile = 1 << 7
-};
-
 // StackDepot efficiently stores huge amounts of stack traces.
 struct MemoroStackDepotNode;
 struct MemoroStackDepotHandle {
   MemoroStackDepotNode *node_;
-  StaticSpinMutex mu_;
   MemoroStackDepotHandle() : node_(nullptr) {}
   explicit MemoroStackDepotHandle(MemoroStackDepotNode *node) : node_(node) {}
   bool valid() { return node_; }
   u32 id();
   int use_count();
   void inc_use_count_unsafe();
-  StackTrace trace();
-  void new_chunk(MemoroMemoryChunk& newChunk);
-  void ForEachChunk(ForEachMemChunkCb func, void* arg);
-  bool TraceHasMain();
-  bool TraceHasUnknown();
-  uptr total_chunks() const;
-  void add_inefficiency(Inefficiency i);
-  bool has_inefficiency(Inefficiency i);
-  bool has_inefficiencies();
-  static bool ChunkNumComparator(const MemoroStackDepotHandle &a,
-                                 const MemoroStackDepotHandle &b);
 };
-
 
 typedef void (*ForEachStackTraceCb) (const MemoroStackAndChunks& handle, void* arg);
 const int kStackDepotMaxUseCount = 1U << 20;
 
-StackDepotStats *StackDepotGetStats();
 MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack);
 MemoroStackAndChunks MemoroStackDepotGet(u32 id);
 void MemoroStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void* arg);
 void MemoroStackDepot_SortAllChunkVectors();
-
-// Retrieves a stored stack trace by the id.
-//StackAndChunks StackDepotGet(u32 id);
 
 void MemoroStackDepotLockAll();
 void MemoroStackDepotUnlockAll();

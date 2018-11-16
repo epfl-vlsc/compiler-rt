@@ -26,7 +26,6 @@ struct MemoroStackDepotNode {
   u32 tag;
   // memoro stats
   ChunkVec* chunk_vec = nullptr;
-  u64 inefficiencies = 0; // bit vector of Inefficiency enum
   uptr stack[1];  // [size]
 
 
@@ -112,55 +111,12 @@ void MemoroStackDepotHandle::inc_use_count_unsafe() {
   CHECK_LT(prev + 1, MemoroStackDepotNode::kMaxUseCount);
 }
 
-StackTrace MemoroStackDepotHandle::trace() {
-  return StackTrace(&node_->stack[0], node_->size, node_->tag);
-}
-
-void MemoroStackDepotHandle::new_chunk(MemoroMemoryChunk& newChunk) {
-  ChunkVec* vec = node_->chunk_vec;
-  //SpinMutexLock l(&mu_); // multiple threads can free chunks at the same time, we need to sync
-  vec->push_back(newChunk);
-}
-
-uptr MemoroStackDepotHandle::total_chunks() const {
-  return node_->chunk_vec->size();
-}
-
-void MemoroStackDepotHandle::ForEachChunk(ForEachMemChunkCb func, void* arg) {
-  auto vec = node_->chunk_vec;
-  //Printf("handle has %d chunks\n", vec->size());
-  for (uptr i = 0; i < vec->size(); i++) {
-    func((*vec)[i], arg);
-  }
-}
-
-void MemoroStackDepotHandle::add_inefficiency(Inefficiency i) {
-  node_->inefficiencies |= i;
-}
-
-bool MemoroStackDepotHandle::has_inefficiency(Inefficiency i) {
-  return node_->inefficiencies & i;
-}
-
-bool MemoroStackDepotHandle::has_inefficiencies() {
-  return node_->inefficiencies != 0;
-}
-
-bool MemoroStackDepotHandle::ChunkNumComparator(const MemoroStackDepotHandle &a, const MemoroStackDepotHandle &b) {
-  return a.total_chunks() < b.total_chunks();
-}
-
-
 // FIXME(dvyukov): this single reserved bit is used in TSan.
 typedef InternalMmapVectorNoCtor<u32> MemoroStackDepotIndexes;
 typedef StackDepotBase<MemoroStackDepotNode, 1, MemoroStackDepotNode::kTabSizeLog>
     MemoroStackDepot;
 static MemoroStackDepot theDepot;
 static MemoroStackDepotIndexes theDepotIndexes;
-
-StackDepotStats *StackDepotGetStats() {
-  return theDepot.GetStats();
-}
 
 MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack) {
   bool inserted = false;

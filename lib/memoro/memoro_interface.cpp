@@ -55,236 +55,27 @@ void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
   }
 }
 
-struct FindReallocsMeta {
-  __sanitizer::u64 last_size = 0;
-  __sanitizer::u32 current_run = 0;
-  __sanitizer::u32 longest_run = 0;
-};
-
-// a ForEachStackTrace callback
-void FindBadReallocsCb(MemoroStackDepotHandle& handle, void* arg) {
-
-  // find instances where chunk size from the same allocation point
-  // continually increase --> implying an up front, large allocation
-  // would be better
-  // we allow for multiple "runs" because the allocation point could be
-  // in a loop
-
-  // don't include stack traces that don't originate from main()
-  /*if (!handle.TraceHasMain()) {
-    return;
-  }*/
-
-  FindReallocsMeta meta;
-  handle.ForEachChunk([](MemoroMemoryChunk& chunk, void* arg){
-    FindReallocsMeta* cur = (FindReallocsMeta*) arg;
-    if (cur->last_size == 0) {
-      cur->last_size = chunk.size;
-      cur->current_run++;
-      return;
-    }
-    if (chunk.size > cur->last_size) {
-      cur->last_size = chunk.size;
-      cur->current_run++;
-    } else {
-      cur->longest_run = cur->current_run > cur->longest_run ? cur->current_run : cur->longest_run;
-      cur->current_run = 0;
-      cur->last_size = chunk.size;
-    }
-  }, &meta);
-
-  if (meta.longest_run >= getFlags()->realloc_min_run) {
-    handle.add_inefficiency(Inefficiency::IncreasingReallocs);
-  }
-}
-// a ForEachStackTrace callback
-void FindEarlyAllocLateFreeCb(MemoroStackDepotHandle& handle, void* arg) {
-
-  // find instances where the first access is over half the lifetime
-  // of the chunk
-
-  // don't include stack traces that don't originate from main()
-  /*if (!handle.TraceHasMain()) {
-    return;
-  }*/
-
-  bool has_early_alloc = false;
-  handle.ForEachChunk([](MemoroMemoryChunk& chunk, void* arg){
-    if (chunk.timestamp_first_access - chunk.timestamp_start >
-            (chunk.timestamp_end - chunk.timestamp_start) / 2) {
-      bool* has_early = (bool*) arg;
-      *has_early = true;
-    }
-  }, &has_early_alloc);
-
-  bool has_late_free = false;
-  handle.ForEachChunk([](MemoroMemoryChunk& chunk, void* arg){
-    if (chunk.timestamp_end - chunk.timestamp_last_access >
-        (chunk.timestamp_end - chunk.timestamp_start) / 2) {
-      bool* has_late = (bool*) arg;
-      *has_late = true;
-    }
-  }, &has_late_free);
-
-  if (has_early_alloc) {
-    handle.add_inefficiency(Inefficiency::EarlyAlloc);
-  }
-  if (has_late_free) {
-    handle.add_inefficiency(Inefficiency::LateFree);
-  }
-}
-
-// a ForEachStackTrace callback
-void FindUnusedAllocsCb(MemoroStackDepotHandle& handle, void* arg) {
-
-  // tally total reads and writes to chunks produced by this alloc point
-  // we try to find points that produce basically unused allocs
-
-  // don't include stack traces that don't originate from main()
-  /*if (!handle.TraceHasMain()) {
-    return;
-  }*/
-
-  int total_reads = 0, total_writes = 0;
-  handle.ForEachChunk([](MemoroMemoryChunk& chunk, void* arg){
-    int* r = (int*)arg;
-    *r += (int) chunk.num_reads;
-  }, &total_reads);
-  handle.ForEachChunk([](MemoroMemoryChunk& chunk, void* arg){
-    int* w = (int*)arg;
-    *w += (int) chunk.num_writes;
-  }, &total_writes);
-
-  if (total_reads == 0 || total_writes == 0) {
-    if (total_writes > 0) {
-      handle.add_inefficiency(Inefficiency::WriteOnly);
-    } else if (total_reads > 0) {
-      handle.add_inefficiency(Inefficiency::ReadOnly);
-    } else {
-      handle.add_inefficiency(Inefficiency::Unused);
-    }
-  }
-
-}
-
-// a ForEachStackTrace callback
-void FindShortLifetimeAllocs(MemoroStackDepotHandle& handle, void* arg) {
-
-  // Currently flags an allocation point that produces *any* short
-  // lived chunks
-  //handle.trace().Print();
-  // don't include stack traces that don't originate from main()
-  // TODO do this once and filter them up front
-  /*if (!handle.TraceHasMain()) {
-    Printf("no main\n");
-    return;
-  }*/
-
-  __sanitizer::u64 min_lifetime = UINT64_MAX;
-  handle.ForEachChunk([](MemoroMemoryChunk& chunk, void* arg){
-    __sanitizer::u64* cur_min = (__sanitizer::u64*)arg;
-    __sanitizer::u64 lifetime = timestamp_diff(chunk.timestamp_start, chunk.timestamp_end);
-    if (lifetime < *cur_min)
-      *cur_min = lifetime;
-  }, &min_lifetime);
-
-  if (min_lifetime < getFlags()->short_lifetime) {
-    handle.add_inefficiency(Inefficiency::ShortLifetime);
-  }
-
-}
-
 void TallyAllocationPoint(const MemoroStackAndChunks& sc, void* arg) {
-
-  // Currently flags an allocation point that produces *any* short
-  // lived chunks
-
-  // don't include stack traces that don't originate from main()
-  // TODO do this once and filter them up front
-  /*if (sc.st.TraceHasUnknown()) {
-    return;
-  }*/
-
   auto vec = (InternalMmapVector<MemoroStackAndChunks>*) arg;
   vec->push_back(sc);
-
 }
 
 static __sanitizer::u64 memoro_start;
 
-// a ForEachStackTrace callback
-void PrintCollectedStats(MemoroStackDepotHandle& handle, void* arg) {
-  if (handle.has_inefficiencies()) {
-    if (!handle.has_inefficiency(Inefficiency::Unused)) {
-      Printf("---------- Allocation Point: ----------\n");
-      handle.trace().Print();
-      if (handle.has_inefficiency(Inefficiency::Unused))
-        Printf("--> Produces totally unused chunks (but may be from un-instrumented code)\n");
-      if (handle.has_inefficiency(Inefficiency::ReadOnly))
-        Printf("--> Produces read-only chunks (may be from un-instrumented code)\n");
-      if (handle.has_inefficiency(Inefficiency::WriteOnly))
-        Printf("--> Produces write-only chunks\n");
-      if (handle.has_inefficiency(Inefficiency::ShortLifetime))
-        Printf("--> Allocates chunks with very short lifetimes ( < %lld ms )\n", getFlags()->short_lifetime / 1000000);
-      if (!handle.has_inefficiency(Inefficiency::ShortLifetime)) {
-        // these really only make sense if chunks don't have short lifetimes
-        if (handle.has_inefficiency(Inefficiency::EarlyAlloc))
-          Printf("--> Allocates chunks early (first access after half of lifetime)\n");
-        if (handle.has_inefficiency(Inefficiency::LateFree))
-          Printf("--> Free chunks late (last access less than half of lifetime)\n");
-      }
-      if (handle.has_inefficiency(Inefficiency::IncreasingReallocs))
-        Printf("--> Has increasing allocation size patterns (did you put an alloc in a loop?)\n");
-      if (handle.has_inefficiency(Inefficiency::TopPercentile))
-        Printf("--> Is in the top %d-th percentile of chunks allocated\n", getFlags()->percentile);
-
-      if (getFlags()->verbose_chunks) {
-        handle.ForEachChunk([](MemoroMemoryChunk &chunk, void *arg) {
-          Printf("Chunk: Size: %d, Reads: %d, Writes: %d, Lifetime: %lld, WasAllocated: %d\n",
-                 chunk.size, chunk.num_reads, chunk.num_writes,
-                 timestamp_diff(chunk.timestamp_start, chunk.timestamp_end), chunk.allocated);
-        }, arg);
-
-      } else {
-        int count = 0;
-        handle.ForEachChunk([](MemoroMemoryChunk &chunk, void *arg) {
-          int * c = (int*) arg;
-          (*c)++;
-        }, &count);
-        Printf("%d chunks allocated at this point\n", count);
-
-      }
-      Printf("---------------------------------------\n");
-    }
-
-  }
-}
-
 static void OnExit () {
-
-  //Printf("total hits %d\n", total_hits);
-  //Printf("heap hits %d\n", heap_hits);
-
   if (getFlags()->no_output)
     return;
+
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
-  //Printf("Memoro pre-processing still allocated chunks ...\n");
   __sanitizer::u64 end_ts = get_timestamp();
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
-  //Printf("total hits: %lld, heap hits: %lld\n", total_hits, heap_hits);
-
-  // run all the different analyses across the different allocation
-  // point stack traces
-  // TODO add args to enable / disable individual analyses
   //Printf("Memoro sorting chunks ...\n");
   MemoroStackDepot_SortAllChunkVectors();
 
-
   // making a copy of stack trace handles, pointed-to data
   // is not duplicated
-  // most things in this entire function could be optimized
   InternalMmapVector<MemoroStackAndChunks> all_alloc_points;
   MemoroStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
   //Printf("Program has %d active allocation points this run\n", all_alloc_points.size());
@@ -301,7 +92,6 @@ static void OnExit () {
     alloc_point.st.SPrint(buf, buflen, "#%n %p %F %L|");
 
     writer.WriteTrace(buf);
-    //writer.WriteTrace(alloc_point.trace().trace, alloc_point.trace().size);
 
     for (uptr j = 0; j < alloc_point.chunks->size(); j++) {
       MemoroMemoryChunk &chunk = (*alloc_point.chunks)[j];
@@ -316,15 +106,11 @@ static void OnExit () {
 
       //Printf("interval high %d\n", chunk.access_interval_low);
       writer.WriteChunk(chunk, i);
-
     }
   }
 
   if (!writer.OutputFiles())
     Printf("Error writing trace or chunk files!\n");
-
-  //MemoroStackDepot_ForEachStackTrace(PrintCollectedStats, nullptr);
-
 }
 
 
