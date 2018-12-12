@@ -1,4 +1,4 @@
-//=-- memoro_common_mac.cc --------------------------------------------------===//
+//=-- memoro_common_mac.cc ------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,13 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sanitizer_common/sanitizer_platform.h"
 #include "memoro_common.h"
+#include "sanitizer_common/sanitizer_platform.h"
 
 #if SANITIZER_MAC
 
-#include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "memoro_allocator.h"
+#include "sanitizer_common/sanitizer_allocator_internal.h"
 
 #include <pthread.h>
 

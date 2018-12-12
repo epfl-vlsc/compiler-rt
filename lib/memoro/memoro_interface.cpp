@@ -1,4 +1,4 @@
-//===-- memoro_interface.cpp ------------------------------------------------===//
+//===-- memoro_interface.cpp ----------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure 
 //
@@ -71,18 +71,14 @@ static void OnExit () {
   __sanitizer::u64 end_ts = get_timestamp();
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
-  //Printf("Memoro sorting chunks ...\n");
   MemoroStackDepot_SortAllChunkVectors();
 
   // making a copy of stack trace handles, pointed-to data
   // is not duplicated
   InternalMmapVector<MemoroStackAndChunks> all_alloc_points;
   MemoroStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
-  //Printf("Program has %d active allocation points this run\n", all_alloc_points.size());
-
 
   // write all alloc points and chunks to file
-  // this could be pretty big ...
   const __sanitizer::uptr buflen = 1024*1024;
   char buf[buflen];  // 1MB because i dont care
   TraceWriter writer(1024, 1024*1024);
@@ -123,9 +119,8 @@ extern "C" void __memoro_init(ToolType Tool, void *Ptr) {
   CacheBinaryName();
   AvoidCVE_2016_2143();
   InitializeFlags();
-  /* InitCommonMemoro(); */
   InitializeAllocator();
-  /* ReplaceSystemMalloc(); */
+  ReplaceSystemMalloc();
   InitTlsSize();
   InitializeInterceptors();
   InitializeThreadRegistry();

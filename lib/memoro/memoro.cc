@@ -1,4 +1,4 @@
-//=-- memoro.cc -------------------------------------------------------------===//
+//=-- memoro.cc -----------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sanitizer_common/sanitizer_flag_parser.h"
 #include "memoro.h"
-#include "memoro_timer.h"
 #include "memoro_allocator.h"
 #include "memoro_thread.h"
+#include "memoro_timer.h"
+#include "sanitizer_common/sanitizer_flag_parser.h"
 
 namespace __memoro {
 
@@ -26,12 +26,12 @@ u64 total_hits = 0;
 u64 heap_hits = 0;
 
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
-/*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
-          IsWrite ? 'w' : 'r', Addr, Size);*/
+  /*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
+            IsWrite ? 'w' : 'r', Addr, Size);*/
 
   total_hits++;
-  void *p = (void*)Addr;
-  if (PointerIsAllocator(p) ) {
+  void *p = (void *)Addr;
+  if (PointerIsAllocator(p)) {
     heap_hits++;
     MemoroMetadata m(Addr);
     u64 ts = get_timestamp();
@@ -49,19 +49,16 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
     // use uptr for arithmetic
     uptr begin = (uptr)GetBlockBegin(p);
     if (Addr - begin < m.interval_low())
-      m.set_interval_low(Addr-begin);
-    if (Addr-begin+Size > m.interval_high())
-      m.set_interval_high((u32)Addr-begin+Size);
+      m.set_interval_low(Addr - begin);
+    if (Addr - begin + Size > m.interval_high())
+      m.set_interval_high((u32)Addr - begin + Size);
 
-    // this is prob too expensive
+    // this is prob expensive because GetCurrentThread locks
     // TODO make optional
-    /*if (GetCurrentThread() != m.creating_thread()) {
+    if (GetCurrentThread() != m.creating_thread()) {
       m.set_multi_thread();
-    }*/
+    }
   }
 }
 
-}  // namespace __memoro
-
-
-
+} // namespace __memoro

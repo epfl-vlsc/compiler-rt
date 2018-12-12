@@ -1,4 +1,4 @@
-//=-- memoro_thread.h -------------------------------------------------------===//
+//=-- memoro_thread.h -----------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -27,7 +27,7 @@ namespace __memoro {
 
 using namespace __sanitizer;
 class ThreadContext : public ThreadContextBase {
- public:
+public:
   explicit ThreadContext(u32 tid);
   void OnStarted(void *arg) override;
   void OnFinished() override;
@@ -39,10 +39,8 @@ class ThreadContext : public ThreadContextBase {
   uptr cache_end() { return cache_end_; }
   DTLS *dtls() { return dtls_; }
 
- private:
-  uptr stack_begin_, stack_end_,
-       cache_begin_, cache_end_,
-       tls_begin_, tls_end_;
+private:
+  uptr stack_begin_, stack_end_, cache_begin_, cache_end_, tls_begin_, tls_end_;
   DTLS *dtls_;
 };
 
@@ -60,6 +58,6 @@ u32 GetCurrentThread();
 void SetCurrentThread(u32 tid);
 ThreadContext *CurrentThreadContext();
 void EnsureMainThreadIDIsCorrect();
-}  // namespace __memoro
+} // namespace __memoro
 
-#endif  // MEMORO_THREAD_H
+#endif // MEMORO_THREAD_H

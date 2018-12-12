@@ -1,4 +1,4 @@
-//=-- memoro_thread.cc ------------------------------------------------------===//
+//=-- memoro_thread.cc ----------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -16,9 +16,9 @@
 
 #include "memoro_thread.h"
 
+#include "memoro_allocator.h"
 #include "sanitizer_common/sanitizer_placement_new.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
-#include "memoro_allocator.h"
 
 namespace __memoro {
 
@@ -27,7 +27,7 @@ static bool initialized;
 
 static ThreadContextBase *CreateThreadContext(u32 tid) {
   void *mem = MmapOrDie(sizeof(ThreadContext), "ThreadContext");
-  return new(mem) ThreadContext(tid);
+  return new (mem) ThreadContext(tid);
 }
 
 static const uptr kMaxThreads = 1 << 13;
@@ -35,28 +35,18 @@ static const uptr kThreadQuarantineSize = 64;
 
 void InitializeThreadRegistry() {
   static ALIGNED(64) char thread_registry_placeholder[sizeof(ThreadRegistry)];
-  thread_registry = new(thread_registry_placeholder)
-    ThreadRegistry(CreateThreadContext, kMaxThreads, kThreadQuarantineSize);
+  thread_registry = new (thread_registry_placeholder)
+      ThreadRegistry(CreateThreadContext, kMaxThreads, kThreadQuarantineSize);
 }
 
-ThreadRegistry &memoroThreadRegistry() {
-  return *thread_registry;
-}
+ThreadRegistry &memoroThreadRegistry() { return *thread_registry; }
 
 ThreadContext::ThreadContext(u32 tid)
-    : ThreadContextBase(tid),
-      stack_begin_(0),
-      stack_end_(0),
-      cache_begin_(0),
-      cache_end_(0),
-      tls_begin_(0),
-      tls_end_(0),
-      dtls_(nullptr) {}
+    : ThreadContextBase(tid), stack_begin_(0), stack_end_(0), cache_begin_(0),
+      cache_end_(0), tls_begin_(0), tls_end_(0), dtls_(nullptr) {}
 
 struct OnStartedArgs {
-  uptr stack_begin, stack_end,
-       cache_begin, cache_end,
-       tls_begin, tls_end;
+  uptr stack_begin, stack_end, cache_begin, cache_end, tls_begin, tls_end;
   DTLS *dtls;
 };
 
@@ -100,7 +90,8 @@ void ThreadFinish() {
 }
 
 ThreadContext *CurrentThreadContext() {
-  if (!thread_registry) return nullptr;
+  if (!thread_registry)
+    return nullptr;
   if (GetCurrentThread() == kInvalidTid)
     return nullptr;
   // No lock needed when getting current thread.
@@ -113,12 +104,12 @@ static bool FindThreadByUid(ThreadContextBase *tctx, void *arg) {
 }
 
 u32 ThreadTid(uptr uid) {
-  return thread_registry->FindThread(FindThreadByUid, (void*)uid);
+  return thread_registry->FindThread(FindThreadByUid, (void *)uid);
 }
 
 void ThreadJoin(u32 tid) {
   CHECK_NE(tid, kInvalidTid);
-  thread_registry->JoinThread(tid, /* arg */nullptr);
+  thread_registry->JoinThread(tid, /* arg */ nullptr);
 }
 
 void EnsureMainThreadIDIsCorrect() {
@@ -133,7 +124,8 @@ bool GetThreadRangesLocked(uptr os_id, uptr *stack_begin, uptr *stack_end,
                            uptr *cache_end, DTLS **dtls) {
   ThreadContext *context = static_cast<ThreadContext *>(
       thread_registry->FindThreadContextByOsIDLocked(os_id));
-  if (!context) return false;
+  if (!context)
+    return false;
   *stack_begin = context->stack_begin();
   *stack_end = context->stack_end();
   *tls_begin = context->tls_begin();
@@ -145,15 +137,10 @@ bool GetThreadRangesLocked(uptr os_id, uptr *stack_begin, uptr *stack_end,
 }
 
 void ForEachExtraStackRange(uptr os_id, RangeIteratorCallback callback,
-                            void *arg) {
-}
+                            void *arg) {}
 
-void LockThreadRegistry() {
-  thread_registry->Lock();
-}
+void LockThreadRegistry() { thread_registry->Lock(); }
 
-void UnlockThreadRegistry() {
-  thread_registry->Unlock();
-}
+void UnlockThreadRegistry() { thread_registry->Unlock(); }
 
 } // namespace __memoro

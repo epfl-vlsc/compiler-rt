@@ -1,4 +1,4 @@
-//=-- memoro_allocator.cc ---------------------------------------------------===//
+//=-- memoro_allocator.cc -------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,11 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sanitizer_common/sanitizer_allocator_interface.h"
-#include "memoro_stackdepot.h"
+#include "sanitizer_common/sanitizer_errno_codes.h"
 #include "memoro_allocator.h"
-#include "memoro_timer.h"
+#include "memoro_stackdepot.h"
 #include "memoro_thread.h"
+#include "memoro_timer.h"
+#include "sanitizer_common/sanitizer_allocator_interface.h"
+#include "sanitizer_common/sanitizer_allocator_checks.h"
 
 extern "C" void *memset(void *ptr, int value, uptr num);
 
@@ -38,33 +40,33 @@ bool PointerIsAllocator(void *p) {
   return allocator.PointerIsMine(p);
 }
 
-void AllocatorThreadFinish() {
-  allocator.SwallowCache(GetAllocatorCache());
-}
+void AllocatorThreadFinish() { allocator.SwallowCache(GetAllocatorCache()); }
 
-void* GetBlockBegin(void * p) {
+void *GetBlockBegin(void *p) {
   /* return allocator.GetBlockBeginUnsafe(p); */
   return allocator.GetBlockBegin(p);
 }
 
 static ChunkMetadata *Metadata(const void *p) {
   /* void * p_begin = allocator.GetBlockBeginUnsafe(p); */
-  void * p_begin = allocator.GetBlockBegin(p);
+  void *p_begin = allocator.GetBlockBegin(p);
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p_begin));
 }
 
-static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 ts) {
-  if (!p) return;
+static void RegisterAllocation(const StackTrace &stack, void *p, uptr size,
+                               u64 ts) {
+  if (!p)
+    return;
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
   // TODO tag with thread id?
-  m->requested_size = size; // This must always be present, or memoro_mz_size fails (and
-                            // so does malloc_zone_from_ptr on Mac).
-  MemoroStackDepotHandle handle = MemoroStackDepotPut_WithHandle(stack) ;
+  m->requested_size = size; // This must always be present, or memoro_mz_size
+                            // fails (and so does malloc_zone_from_ptr on Mac).
+  MemoroStackDepotHandle handle = MemoroStackDepotPut_WithHandle(stack);
   m->stack_trace_id = handle.id();
   m->num_reads = 0;
   m->num_writes = 0;
-  m->latest_timestamp = 0;  // access timestamps
+  m->latest_timestamp = 0; // access timestamps
   m->first_timestamp = 0;
   u64 now = get_timestamp();
   m->timestamp = now;
@@ -74,16 +76,18 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size, u64 
   m->access_interval_low = 0xffffffff;
   m->access_interval_high = 0;
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
-  //uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
-  //Printf("memoro allocate %d bytes, actual size %d bytes, p %llx, metadata %llx\n", size, allocatedSize, p, Metadata(p));
+  // uptr allocatedSize = allocator.GetActuallyAllocatedSize(p);
+  // Printf("memoro allocate %d bytes, actual size %d bytes, p %llx, metadata
+  // %llx\n", size, allocatedSize, p, Metadata(p));
 }
 
 static void RegisterDeallocation(void *p) {
-  if (!p) return;
+  if (!p)
+    return;
   // get dealloc timestamp
   u64 ts = get_timestamp();
   ChunkMetadata *m = Metadata(p);
-  //u64 diff_ns = timestamp_diff(m->timestamp, ts);
+  // u64 diff_ns = timestamp_diff(m->timestamp, ts);
   CHECK(m);
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
 
@@ -155,7 +159,8 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 
 uptr GetMallocUsableSize(const void *p) {
   ChunkMetadata *m = Metadata(p);
-  if (!m) return 0;
+  if (!m)
+    return 0;
   return m->requested_size;
 }
 
@@ -163,13 +168,26 @@ void *memoro_memalign(uptr alignment, uptr size, const StackTrace &stack) {
   return Allocate(stack, size, alignment, kAlwaysClearMemory);
 }
 
+int memoro_posix_memalign(void **memptr, uptr alignment, uptr size,
+                        const StackTrace &stack) {
+  if (UNLIKELY(!CheckPosixMemalignAlignment(alignment))) {
+    if (AllocatorMayReturnNull())
+      return errno_EINVAL;
+  }
+  void *ptr = Allocate(stack, size, alignment, kAlwaysClearMemory);
+  if (UNLIKELY(!ptr))
+    // OOM error is already taken care of by Allocate.
+    return errno_ENOMEM;
+  CHECK(IsAligned((uptr)ptr, alignment));
+  *memptr = ptr;
+  return 0;
+}
+
 void *memoro_malloc(uptr size, const StackTrace &stack) {
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 }
 
-void memoro_free(void *p) {
-  Deallocate(p);
-}
+void memoro_free(void *p) { Deallocate(p); }
 
 void *memoro_realloc(void *p, uptr size, const StackTrace &stack) {
   return Reallocate(stack, p, size, 1);
@@ -186,32 +204,24 @@ void *memoro_valloc(uptr size, const StackTrace &stack) {
   return Allocate(stack, size, GetPageSizeCached(), kAlwaysClearMemory);
 }
 
-uptr memoro_mz_size(const void *p) {
-  return GetMallocUsableSize(p);
-}
+uptr memoro_mz_size(const void *p) { return GetMallocUsableSize(p); }
 
 ///// Interface to the common LSan module. /////
 
-void LockAllocator() {
-  allocator.ForceLock();
-}
+void LockAllocator() { allocator.ForceLock(); }
 
-void UnlockAllocator() {
-  allocator.ForceUnlock();
-}
+void UnlockAllocator() { allocator.ForceUnlock(); }
 
 void GetAllocatorGlobalRange(uptr *begin, uptr *end) {
   *begin = (uptr)&allocator;
   *end = *begin + sizeof(allocator);
 }
 
-uptr GetUserBegin(uptr chunk) {
-  return chunk;
-}
+uptr GetUserBegin(uptr chunk) { return chunk; }
 
 MemoroMetadata::MemoroMetadata(uptr chunk) {
   metadata_ = Metadata(reinterpret_cast<void *>(chunk));
-  //Printf("metadata pointer for %%lld is %lld\n", chunk, metadata_);
+  // Printf("metadata pointer for %%lld is %lld\n", chunk, metadata_);
   CHECK(metadata_);
 }
 
@@ -338,13 +348,13 @@ uptr __sanitizer_get_allocated_size(const void *p) {
 
 #if !SANITIZER_SUPPORTS_WEAK_HOOKS
 // Provide default (no-op) implementation of malloc hooks.
-SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-void __sanitizer_malloc_hook(void *ptr, uptr size) {
+SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE void
+__sanitizer_malloc_hook(void *ptr, uptr size) {
   (void)ptr;
   (void)size;
 }
-SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-void __sanitizer_free_hook(void *ptr) {
+SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE void
+__sanitizer_free_hook(void *ptr) {
   (void)ptr;
 }
 #endif

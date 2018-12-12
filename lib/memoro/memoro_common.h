@@ -1,4 +1,4 @@
-//=-- memoro_common.h -------------------------------------------------------===//
+//=-- memoro_common.h -----------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -27,11 +27,11 @@
 namespace __sanitizer {
 class FlagParser;
 struct DTLS;
-}
+} // namespace __sanitizer
 
 namespace __memoro {
 
-const u32 kInvalidTid = (u32) -1;
+const u32 kInvalidTid = (u32)-1;
 
 // Platform-specific functions.
 void InitializePlatformSpecificModules();
@@ -48,7 +48,6 @@ enum IgnoreObjectResult {
 };
 
 // Functions called from the parent tool.
-void InitCommonMemoro();
 void DisableCounterUnderflow();
 bool DisabledInThisThread();
 
@@ -107,9 +106,9 @@ bool WordIsPoisoned(uptr addr);
 // Wrappers for ThreadRegistry access.
 void LockThreadRegistry();
 void UnlockThreadRegistry();
-  bool GetThreadRangesLocked(uptr os_id, uptr *stack_begin, uptr *stack_end,
-                             uptr *tls_begin, uptr *tls_end, uptr *cache_begin,
-                             uptr *cache_end, DTLS **dtls);
+bool GetThreadRangesLocked(uptr os_id, uptr *stack_begin, uptr *stack_end,
+                           uptr *tls_begin, uptr *tls_end, uptr *cache_begin,
+                           uptr *cache_end, DTLS **dtls);
 void ForEachExtraStackRange(uptr os_id, RangeIteratorCallback callback,
                             void *arg);
 // If called from the main thread, updates the main thread's TID in the thread
@@ -132,7 +131,7 @@ LoadedModule *GetLinker();
 
 // Wrapper for chunk metadata operations.
 class MemoroMetadata {
- public:
+public:
   // Constructor accepts address of user-visible chunk.
   explicit MemoroMetadata(uptr chunk);
   bool allocated() const;
@@ -155,18 +154,18 @@ class MemoroMetadata {
   u64 alloc_call_time() const;
   void set_interval_low(u32 value);
   void set_interval_high(u32 value);
- //private:
+  // private:
   void *metadata_;
 };
 
-}  // namespace __memoro
+} // namespace __memoro
 
 extern "C" {
-SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-int __memoro_is_turned_off();
+SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE int
+__memoro_is_turned_off();
 
-SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-const char *__memoro_default_suppressions();
-}  // extern "C"
+SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE const char *
+__memoro_default_suppressions();
+} // extern "C"
 
-#endif  // MEMORO_COMMON_H
+#endif // MEMORO_COMMON_H

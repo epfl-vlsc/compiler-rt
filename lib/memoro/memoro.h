@@ -1,4 +1,4 @@
-//=-- memoro.h --------------------------------------------------------------===//
+//=-- memoro.h ------------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "memoro_interface_internal.h"
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
-#include "memoro_interface_internal.h"
 
 #define GET_STACK_TRACE(max_size, fast)                                        \
   BufferedStackTrace stack;                                                    \
@@ -34,11 +34,11 @@
     }                                                                          \
   }
 
-#define GET_STACK_TRACE_FATAL \
+#define GET_STACK_TRACE_FATAL                                                  \
   GET_STACK_TRACE(kStackTraceMax, common_flags()->fast_unwind_on_fatal)
 
-#define GET_STACK_TRACE_MALLOC                                      \
-  GET_STACK_TRACE(common_flags()->malloc_context_size, \
+#define GET_STACK_TRACE_MALLOC                                                 \
+  GET_STACK_TRACE(common_flags()->malloc_context_size,                         \
                   common_flags()->fast_unwind_on_malloc)
 
 namespace __memoro {
@@ -49,15 +49,16 @@ void ReplaceSystemMalloc();
 
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
 
-#define ENSURE_MEMORO_INITED() do {   \
-  CHECK(!memoro_init_is_running);   \
-  if (!memoro_inited)               \
-    __memoro_init((ToolType)0, nullptr);                \
-} while (0)
+#define ENSURE_MEMORO_INITED()                                                 \
+  do {                                                                         \
+    CHECK(!memoro_init_is_running);                                            \
+    if (!memoro_inited)                                                        \
+      __memoro_init((ToolType)0, nullptr);                                     \
+  } while (0)
 
-  extern u64 total_hits;
-  extern u64 heap_hits;
-}  // namespace __memoro
+extern u64 total_hits;
+extern u64 heap_hits;
+} // namespace __memoro
 
 extern bool memoro_inited;
 extern bool memoro_init_is_running;

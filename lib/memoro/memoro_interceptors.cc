@@ -1,4 +1,4 @@
-//=-- memoro_interceptors.cc ------------------------------------------------===//
+//=-- memoro_interceptors.cc ----------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -14,18 +14,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "memoro_interceptors.h"
 #include "interception/interception.h"
-#include "sanitizer_common/sanitizer_allocator_checks.h"
+#include "memoro.h"
+#include "memoro_allocator.h"
+#include "memoro_flags.h"
+#include "memoro_thread.h"
 #include "sanitizer_common/sanitizer_allocator.h"
+#include "sanitizer_common/sanitizer_allocator_checks.h"
 #include "sanitizer_common/sanitizer_platform_interceptors.h"
 #include "sanitizer_common/sanitizer_posix.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
-#include "memoro.h"
-#include "memoro_flags.h"
-#include "memoro_allocator.h"
-#include "memoro_thread.h"
-#include "memoro_interceptors.h"
-#include "memoro_allocator.h"
 
 #include <stddef.h>
 
@@ -34,19 +33,22 @@ using namespace __memoro;
 extern "C" {
 int pthread_attr_init(void *attr);
 int pthread_attr_destroy(void *attr);
-//int pthread_attr_getdetachstate(void *attr, int *v);
-int pthread_key_create(unsigned *key, void (*destructor)(void* v));
+// int pthread_attr_getdetachstate(void *attr, int *v);
+int pthread_key_create(unsigned *key, void (*destructor)(void *v));
 int pthread_setspecific(unsigned key, const void *v);
 }
 
 ///// Malloc/free interceptors. /////
 
 namespace std {
-  struct nothrow_t;
+struct nothrow_t;
 }
 
+DECLARE_REAL_AND_INTERCEPTOR(void *, malloc, uptr)
+DECLARE_REAL_AND_INTERCEPTOR(void, free, void *)
+
 #if !SANITIZER_MAC
-INTERCEPTOR(void*, malloc, uptr size) {
+INTERCEPTOR(void *, malloc, uptr size) {
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_malloc(size, stack);
@@ -57,25 +59,26 @@ INTERCEPTOR(void, free, void *p) {
   memoro_free(p);
 }
 
-INTERCEPTOR(void*, calloc, uptr nmemb, uptr size) {
+INTERCEPTOR(void *, calloc, uptr nmemb, uptr size) {
   if (memoro_init_is_running) {
     // Hack: dlsym calls calloc before REAL(calloc) is retrieved from dlsym.
     const uptr kCallocPoolSize = 1024;
     static uptr calloc_memory_for_dlsym[kCallocPoolSize];
     static uptr allocated;
     uptr size_in_words = ((nmemb * size) + kWordSize - 1) / kWordSize;
-    void *mem = (void*)&calloc_memory_for_dlsym[allocated];
+    void *mem = (void *)&calloc_memory_for_dlsym[allocated];
     allocated += size_in_words;
     CHECK(allocated < kCallocPoolSize);
     return mem;
   }
-  if (CheckForCallocOverflow(size, nmemb)) return nullptr;
+  if (CheckForCallocOverflow(size, nmemb))
+    return nullptr;
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_calloc(nmemb, size, stack);
 }
 
-INTERCEPTOR(void*, realloc, void *q, uptr size) {
+INTERCEPTOR(void *, realloc, void *q, uptr size) {
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_realloc(q, size, stack);
@@ -89,7 +92,7 @@ INTERCEPTOR(int, posix_memalign, void **memptr, uptr alignment, uptr size) {
   return 0;
 }
 
-INTERCEPTOR(void*, valloc, uptr size) {
+INTERCEPTOR(void *, valloc, uptr size) {
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_valloc(size, stack);
@@ -97,7 +100,7 @@ INTERCEPTOR(void*, valloc, uptr size) {
 #endif
 
 #if SANITIZER_INTERCEPT_MEMALIGN
-INTERCEPTOR(void*, memalign, uptr alignment, uptr size) {
+INTERCEPTOR(void *, memalign, uptr alignment, uptr size) {
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_memalign(alignment, size, stack);
@@ -111,14 +114,15 @@ INTERCEPTOR(void *, __libc_memalign, uptr alignment, uptr size) {
   DTLS_on_libc_memalign(res, size);
   return res;
 }
-#define MEMORO_MAYBE_INTERCEPT___LIBC_MEMALIGN INTERCEPT_FUNCTION(__libc_memalign)
+#define MEMORO_MAYBE_INTERCEPT___LIBC_MEMALIGN                                 \
+  INTERCEPT_FUNCTION(__libc_memalign)
 #else
 #define MEMORO_MAYBE_INTERCEPT_MEMALIGN
 #define MEMORO_MAYBE_INTERCEPT___LIBC_MEMALIGN
 #endif // SANITIZER_INTERCEPT_MEMALIGN
 
 #if SANITIZER_INTERCEPT_ALIGNED_ALLOC
-INTERCEPTOR(void*, aligned_alloc, uptr alignment, uptr size) {
+INTERCEPTOR(void *, aligned_alloc, uptr alignment, uptr size) {
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_memalign(alignment, size, stack);
@@ -133,8 +137,8 @@ INTERCEPTOR(uptr, malloc_usable_size, void *ptr) {
   ENSURE_MEMORO_INITED();
   return GetMallocUsableSize(ptr);
 }
-#define MEMORO_MAYBE_INTERCEPT_MALLOC_USABLE_SIZE \
-        INTERCEPT_FUNCTION(malloc_usable_size)
+#define MEMORO_MAYBE_INTERCEPT_MALLOC_USABLE_SIZE                              \
+  INTERCEPT_FUNCTION(malloc_usable_size)
 #else
 #define MEMORO_MAYBE_INTERCEPT_MALLOC_USABLE_SIZE
 #endif
@@ -151,9 +155,7 @@ INTERCEPTOR(struct fake_mallinfo, mallinfo, void) {
 }
 #define MEMORO_MAYBE_INTERCEPT_MALLINFO INTERCEPT_FUNCTION(mallinfo)
 
-INTERCEPTOR(int, mallopt, int cmd, int value) {
-  return -1;
-}
+INTERCEPTOR(int, mallopt, int cmd, int value) { return -1; }
 #define MEMORO_MAYBE_INTERCEPT_MALLOPT INTERCEPT_FUNCTION(mallopt)
 #else
 #define MEMORO_MAYBE_INTERCEPT_MALLINFO
@@ -161,7 +163,7 @@ INTERCEPTOR(int, mallopt, int cmd, int value) {
 #endif // SANITIZER_INTERCEPT_MALLOPT_AND_MALLINFO
 
 #if SANITIZER_INTERCEPT_PVALLOC
-INTERCEPTOR(void*, pvalloc, uptr size) {
+INTERCEPTOR(void *, pvalloc, uptr size) {
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   uptr PageSize = GetPageSizeCached();
@@ -184,9 +186,9 @@ INTERCEPTOR(void, cfree, void *p) ALIAS(WRAPPER_NAME(free));
 #define MEMORO_MAYBE_INTERCEPT_CFREE
 #endif // SANITIZER_INTERCEPT_CFREE
 
-#define OPERATOR_NEW_BODY                              \
-  ENSURE_MEMORO_INITED();                              \
-  GET_STACK_TRACE_MALLOC;                              \
+#define OPERATOR_NEW_BODY                                                      \
+  ENSURE_MEMORO_INITED();                                                      \
+  GET_STACK_TRACE_MALLOC;                                                      \
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 
 INTERCEPTOR_ATTRIBUTE
@@ -194,29 +196,30 @@ void *operator new(size_t size) { OPERATOR_NEW_BODY; }
 INTERCEPTOR_ATTRIBUTE
 void *operator new[](size_t size) { OPERATOR_NEW_BODY; }
 INTERCEPTOR_ATTRIBUTE
-void *operator new(size_t size, std::nothrow_t const&) { OPERATOR_NEW_BODY; }
+void *operator new(size_t size, std::nothrow_t const &) { OPERATOR_NEW_BODY; }
 INTERCEPTOR_ATTRIBUTE
-void *operator new[](size_t size, std::nothrow_t const&) { OPERATOR_NEW_BODY; }
+void *operator new[](size_t size, std::nothrow_t const &) { OPERATOR_NEW_BODY; }
 
-#define OPERATOR_DELETE_BODY \
-  ENSURE_MEMORO_INITED();    \
+#define OPERATOR_DELETE_BODY                                                   \
+  ENSURE_MEMORO_INITED();                                                      \
   Deallocate(ptr);
 
 INTERCEPTOR_ATTRIBUTE
-void operator delete(void *ptr) NOEXCEPT { OPERATOR_DELETE_BODY; }
+void operator delete(void *ptr)NOEXCEPT { OPERATOR_DELETE_BODY; }
 INTERCEPTOR_ATTRIBUTE
 void operator delete[](void *ptr) NOEXCEPT { OPERATOR_DELETE_BODY; }
 INTERCEPTOR_ATTRIBUTE
-void operator delete(void *ptr, std::nothrow_t const&) { OPERATOR_DELETE_BODY; }
+void operator delete(void *ptr, std::nothrow_t const &) {
+  OPERATOR_DELETE_BODY;
+}
 INTERCEPTOR_ATTRIBUTE
 void operator delete[](void *ptr, std::nothrow_t const &) {
   OPERATOR_DELETE_BODY;
 }
 
-
-#define MEMORO_READ_RANGE(ctx, offset, size) \
+#define MEMORO_READ_RANGE(ctx, offset, size)                                   \
   processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, false)
-#define MEMORO_WRITE_RANGE(ctx, offset, size) \
+#define MEMORO_WRITE_RANGE(ctx, offset, size)                                  \
   processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, true)
 
 // Behavior of functions like "memcpy" or "strcpy" is undefined
@@ -226,55 +229,59 @@ static inline bool RangesOverlap(const char *offset1, uptr length1,
                                  const char *offset2, uptr length2) {
   return !((offset1 + length1 <= offset2) || (offset2 + length2 <= offset1));
 }
-#define CHECK_RANGES_OVERLAP(name, _offset1, length1, _offset2, length2) do { \
-  const char *offset1 = (const char*)_offset1; \
-  const char *offset2 = (const char*)_offset2; \
-  if (RangesOverlap(offset1, length1, offset2, length2)) { \
-    GET_STACK_TRACE_FATAL; \
-    Printf("Ranges overlap wtf\n"); \
-  } \
-} while (0)
+#define CHECK_RANGES_OVERLAP(name, _offset1, length1, _offset2, length2)       \
+  do {                                                                         \
+    const char *offset1 = (const char *)_offset1;                              \
+    const char *offset2 = (const char *)_offset2;                              \
+    if (RangesOverlap(offset1, length1, offset2, length2)) {                   \
+      GET_STACK_TRACE_FATAL;                                                   \
+      Printf("Ranges overlap wtf\n");                                          \
+    }                                                                          \
+  } while (0)
 
-#define MEMORO_MEMCPY_IMPL(ctx, to, from, size)                           \
-  do {                                                                  \
-    if (UNLIKELY(!memoro_inited)) return internal_memcpy(to, from, size); \
-    if (memoro_init_is_running) {                                         \
-      return REAL(memcpy)(to, from, size);                              \
-    }                                                                   \
-    ENSURE_MEMORO_INITED();                                               \
-    if (getFlags()->replace_intrin) {                                      \
-      if (to != from) {                                                 \
-        CHECK_RANGES_OVERLAP("memcpy", to, size, from, size);           \
-      }                                                                 \
-      MEMORO_READ_RANGE(ctx, from, size);                                 \
-      MEMORO_WRITE_RANGE(ctx, to, size);                                  \
-    }                                                                   \
-    return REAL(memcpy)(to, from, size);                                \
+#define MEMORO_MEMCPY_IMPL(ctx, to, from, size)                                \
+  do {                                                                         \
+    if (UNLIKELY(!memoro_inited))                                              \
+      return internal_memcpy(to, from, size);                                  \
+    if (memoro_init_is_running) {                                              \
+      return REAL(memcpy)(to, from, size);                                     \
+    }                                                                          \
+    ENSURE_MEMORO_INITED();                                                    \
+    if (getFlags()->replace_intrin) {                                          \
+      if (to != from) {                                                        \
+        CHECK_RANGES_OVERLAP("memcpy", to, size, from, size);                  \
+      }                                                                        \
+      MEMORO_READ_RANGE(ctx, from, size);                                      \
+      MEMORO_WRITE_RANGE(ctx, to, size);                                       \
+    }                                                                          \
+    return REAL(memcpy)(to, from, size);                                       \
   } while (0)
 
 // memset is called inside Printf.
-#define MEMORO_MEMSET_IMPL(ctx, block, c, size)                           \
-  do {                                                                  \
-    if (UNLIKELY(!memoro_inited)) return internal_memset(block, c, size); \
-    if (memoro_init_is_running) {                                         \
-      return REAL(memset)(block, c, size);                              \
-    }                                                                   \
-    ENSURE_MEMORO_INITED();                                               \
-    if (getFlags()->replace_intrin) {                                      \
-      MEMORO_WRITE_RANGE(ctx, block, size);                               \
-    }                                                                   \
-    return REAL(memset)(block, c, size);                                \
+#define MEMORO_MEMSET_IMPL(ctx, block, c, size)                                \
+  do {                                                                         \
+    if (UNLIKELY(!memoro_inited))                                              \
+      return internal_memset(block, c, size);                                  \
+    if (memoro_init_is_running) {                                              \
+      return REAL(memset)(block, c, size);                                     \
+    }                                                                          \
+    ENSURE_MEMORO_INITED();                                                    \
+    if (getFlags()->replace_intrin) {                                          \
+      MEMORO_WRITE_RANGE(ctx, block, size);                                    \
+    }                                                                          \
+    return REAL(memset)(block, c, size);                                       \
   } while (0)
 
-#define MEMORO_MEMMOVE_IMPL(ctx, to, from, size)                           \
-  do {                                                                   \
-    if (UNLIKELY(!memoro_inited)) return internal_memmove(to, from, size); \
-    ENSURE_MEMORO_INITED();                                                \
-    if (getFlags()->replace_intrin) {                                       \
-      MEMORO_READ_RANGE(ctx, from, size);                                  \
-      MEMORO_WRITE_RANGE(ctx, to, size);                                   \
-    }                                                                    \
-    return internal_memmove(to, from, size);                             \
+#define MEMORO_MEMMOVE_IMPL(ctx, to, from, size)                               \
+  do {                                                                         \
+    if (UNLIKELY(!memoro_inited))                                              \
+      return internal_memmove(to, from, size);                                 \
+    ENSURE_MEMORO_INITED();                                                    \
+    if (getFlags()->replace_intrin) {                                          \
+      MEMORO_READ_RANGE(ctx, from, size);                                      \
+      MEMORO_WRITE_RANGE(ctx, to, size);                                       \
+    }                                                                          \
+    return internal_memmove(to, from, size);                                   \
   } while (0)
 
 void SetThreadName(const char *name) {
@@ -292,81 +299,82 @@ struct MemoroInterceptorContext {
   const char *interceptor_name;
 };
 
-
-
-#define MEMORO_INTERCEPTOR_ENTER(ctx, func)                                      \
-  MemoroInterceptorContext _ctx = {#func};                                       \
+#define MEMORO_INTERCEPTOR_ENTER(ctx, func)                                    \
+  MemoroInterceptorContext _ctx = {#func};                                     \
   ctx = (void *)&_ctx;                                                         \
-  (void) ctx;                                                                  \
+  (void)ctx;
 
 #define COMMON_INTERCEPT_FUNCTION(name) MEMORO_INTERCEPT_FUNC(name)
-#define COMMON_INTERCEPT_FUNCTION_VER(name, ver)                          \
+#define COMMON_INTERCEPT_FUNCTION_VER(name, ver)                               \
   MEMORO_INTERCEPT_FUNC_VER(name, ver)
-#define COMMON_INTERCEPTOR_WRITE_RANGE(ctx, ptr, size) \
+#define COMMON_INTERCEPTOR_WRITE_RANGE(ctx, ptr, size)                         \
   MEMORO_WRITE_RANGE(ctx, ptr, size)
-#define COMMON_INTERCEPTOR_READ_RANGE(ctx, ptr, size) \
+#define COMMON_INTERCEPTOR_READ_RANGE(ctx, ptr, size)                          \
   MEMORO_READ_RANGE(ctx, ptr, size)
 #define COMMON_INTERCEPTOR_ENTER(ctx, func, ...)                               \
-  MEMORO_INTERCEPTOR_ENTER(ctx, func);                                           \
+  MEMORO_INTERCEPTOR_ENTER(ctx, func);                                         \
   do {                                                                         \
-    if (memoro_init_is_running)                                                  \
+    if (memoro_init_is_running)                                                \
       return REAL(func)(__VA_ARGS__);                                          \
-    if (SANITIZER_MAC && UNLIKELY(!memoro_inited))                               \
+    if (SANITIZER_MAC && UNLIKELY(!memoro_inited))                             \
       return REAL(func)(__VA_ARGS__);                                          \
-    ENSURE_MEMORO_INITED();                                                      \
+    ENSURE_MEMORO_INITED();                                                    \
   } while (false)
-#define COMMON_INTERCEPTOR_DIR_ACQUIRE(ctx, path) \
-  do {                                            \
+#define COMMON_INTERCEPTOR_DIR_ACQUIRE(ctx, path)                              \
+  do {                                                                         \
   } while (false)
-#define COMMON_INTERCEPTOR_FD_ACQUIRE(ctx, fd) \
-  do {                                         \
+#define COMMON_INTERCEPTOR_FD_ACQUIRE(ctx, fd)                                 \
+  do {                                                                         \
   } while (false)
-#define COMMON_INTERCEPTOR_FD_RELEASE(ctx, fd) \
-  do {                                         \
+#define COMMON_INTERCEPTOR_FD_RELEASE(ctx, fd)                                 \
+  do {                                                                         \
   } while (false)
-#define COMMON_INTERCEPTOR_FD_SOCKET_ACCEPT(ctx, fd, newfd) \
-  do {                                                      \
+#define COMMON_INTERCEPTOR_FD_SOCKET_ACCEPT(ctx, fd, newfd)                    \
+  do {                                                                         \
   } while (false)
 #define COMMON_INTERCEPTOR_SET_THREAD_NAME(ctx, name) SetThreadName(name)
 // Should be memoroThreadRegistry().SetThreadNameByUserId(thread, name)
 // But memoro does not remember UserId's for threads (pthread_t);
 // and remembers all ever existed threads, so the linear search by UserId
 // can be slow.
-#define COMMON_INTERCEPTOR_SET_PTHREAD_NAME(ctx, thread, name) \
-  do {                                                         \
+#define COMMON_INTERCEPTOR_SET_PTHREAD_NAME(ctx, thread, name)                 \
+  do {                                                                         \
   } while (false)
 #define COMMON_INTERCEPTOR_BLOCK_REAL(name) REAL(name)
 // Strict init-order checking is dlopen-hostile:
 // https://github.com/google/sanitizers/issues/178
-#define COMMON_INTERCEPTOR_ON_DLOPEN(filename, flag) {}
+#define COMMON_INTERCEPTOR_ON_DLOPEN(filename, flag)                           \
+  {}
 #define COMMON_INTERCEPTOR_ON_EXIT(ctx) OnExit()
-#define COMMON_INTERCEPTOR_LIBRARY_LOADED(filename, handle) {}
-#define COMMON_INTERCEPTOR_LIBRARY_UNLOADED() {}
+#define COMMON_INTERCEPTOR_LIBRARY_LOADED(filename, handle)                    \
+  {}
+#define COMMON_INTERCEPTOR_LIBRARY_UNLOADED()                                  \
+  {}
 #define COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED (!memoro_inited)
 #define COMMON_INTERCEPTOR_GET_TLS_RANGE(begin, end)                           \
-  if (ThreadContext *t = CurrentThreadContext()) {                                    \
+  if (ThreadContext *t = CurrentThreadContext()) {                             \
     *begin = t->tls_begin();                                                   \
     *end = t->tls_end();                                                       \
   } else {                                                                     \
     *begin = *end = 0;                                                         \
   }
 
-#define COMMON_INTERCEPTOR_MEMMOVE_IMPL(ctx, to, from, size) \
-  do {                                                       \
-    MEMORO_INTERCEPTOR_ENTER(ctx, memmove);                    \
-    MEMORO_MEMMOVE_IMPL(ctx, to, from, size);                  \
+#define COMMON_INTERCEPTOR_MEMMOVE_IMPL(ctx, to, from, size)                   \
+  do {                                                                         \
+    MEMORO_INTERCEPTOR_ENTER(ctx, memmove);                                    \
+    MEMORO_MEMMOVE_IMPL(ctx, to, from, size);                                  \
   } while (false)
 
-#define COMMON_INTERCEPTOR_MEMCPY_IMPL(ctx, to, from, size) \
-  do {                                                      \
-    MEMORO_INTERCEPTOR_ENTER(ctx, memcpy);                    \
-    MEMORO_MEMCPY_IMPL(ctx, to, from, size);                  \
+#define COMMON_INTERCEPTOR_MEMCPY_IMPL(ctx, to, from, size)                    \
+  do {                                                                         \
+    MEMORO_INTERCEPTOR_ENTER(ctx, memcpy);                                     \
+    MEMORO_MEMCPY_IMPL(ctx, to, from, size);                                   \
   } while (false)
 
-#define COMMON_INTERCEPTOR_MEMSET_IMPL(ctx, block, c, size) \
-  do {                                                      \
-    MEMORO_INTERCEPTOR_ENTER(ctx, memset);                    \
-    MEMORO_MEMSET_IMPL(ctx, block, c, size);                  \
+#define COMMON_INTERCEPTOR_MEMSET_IMPL(ctx, block, c, size)                    \
+  do {                                                                         \
+    MEMORO_INTERCEPTOR_ENTER(ctx, memset);                                     \
+    MEMORO_MEMSET_IMPL(ctx, block, c, size);                                   \
   } while (false)
 
 // realpath interceptor does something weird with wrapped malloc on mac OS
@@ -380,7 +388,7 @@ static unsigned g_thread_finalize_key;
 static void thread_finalize(void *v) {
   uptr iter = (uptr)v;
   if (iter > 1) {
-    if (pthread_setspecific(g_thread_finalize_key, (void*)(iter - 1))) {
+    if (pthread_setspecific(g_thread_finalize_key, (void *)(iter - 1))) {
       Report("LeakSanitizer: failed to set thread key.\n");
       Die();
     }
@@ -396,13 +404,13 @@ struct ThreadParam {
 };
 
 extern "C" void *__memoro_thread_start_func(void *arg) {
-  ThreadParam *p = (ThreadParam*)arg;
-  void* (*callback)(void *arg) = p->callback;
+  ThreadParam *p = (ThreadParam *)arg;
+  void *(*callback)(void *arg) = p->callback;
   void *param = p->param;
   // Wait until the last iteration to maximize the chance that we are the last
   // destructor to run.
   if (pthread_setspecific(g_thread_finalize_key,
-                          (void*)GetPthreadDestructorIterations())) {
+                          (void *)GetPthreadDestructorIterations())) {
     Report("LeakSanitizer: failed to set thread key.\n");
     Die();
   }
@@ -443,7 +451,7 @@ INTERCEPTOR(int, pthread_create, void *th, void *attr,
   if (res == 0) {
     // TODO fix this pthread crap
     int tid = ThreadCreate(GetCurrentThread(), *(uptr *)th,
-            /*detached == PTHREAD_CREATE_DETACHED*/false);
+                           /*detached == PTHREAD_CREATE_DETACHED*/ false);
     CHECK_NE(tid, 0);
     atomic_store(&p.tid, tid, memory_order_release);
     while (atomic_load(&p.tid, memory_order_acquire) != 0)
@@ -462,13 +470,12 @@ INTERCEPTOR(int, pthread_join, void *th, void **ret) {
     ThreadJoin(tid);
   return res;
 }
-#define MEMORO_READ_STRING_OF_LEN(ctx, s, len, n)                 \
-  MEMORO_READ_RANGE((ctx), (s),                                   \
-    common_flags()->strict_string_checks ? (len) + 1 : (n))
+#define MEMORO_READ_STRING_OF_LEN(ctx, s, len, n)                              \
+  MEMORO_READ_RANGE((ctx), (s),                                                \
+                    common_flags()->strict_string_checks ? (len) + 1 : (n))
 
-#define MEMORO_READ_STRING(ctx, s, n)                             \
+#define MEMORO_READ_STRING(ctx, s, n)                                          \
   MEMORO_READ_STRING_OF_LEN((ctx), (s), REAL(strlen)(s), (n))
-
 
 static inline uptr MaybeRealStrnlen(const char *s, uptr maxlen) {
 #if SANITIZER_INTERCEPT_STRNLEN
@@ -481,9 +488,9 @@ static inline uptr MaybeRealStrnlen(const char *s, uptr maxlen) {
 
 // For both strcat() and strncat() we need to check the validity of |to|
 // argument irrespective of the |from| length.
-INTERCEPTOR(char*, strcat, char *to, const char *from) {  // NOLINT
+INTERCEPTOR(char *, strcat, char *to, const char *from) { // NOLINT
   void *ctx;
-  MEMORO_INTERCEPTOR_ENTER(ctx, strcat);  // NOLINT
+  MEMORO_INTERCEPTOR_ENTER(ctx, strcat); // NOLINT
   ENSURE_MEMORO_INITED();
   if (getFlags()->replace_str) {
     uptr from_length = REAL(strlen)(from);
@@ -495,14 +502,14 @@ INTERCEPTOR(char*, strcat, char *to, const char *from) {  // NOLINT
     // with the resulting string starting at |to|, which has a length of
     // to_length + from_length + 1.
     if (from_length > 0) {
-      CHECK_RANGES_OVERLAP("strcat", to, from_length + to_length + 1,
-                           from, from_length + 1);
+      CHECK_RANGES_OVERLAP("strcat", to, from_length + to_length + 1, from,
+                           from_length + 1);
     }
   }
-  return REAL(strcat)(to, from);  // NOLINT
+  return REAL(strcat)(to, from); // NOLINT
 }
 
-INTERCEPTOR(char*, strncat, char *to, const char *from, uptr size) {
+INTERCEPTOR(char *, strncat, char *to, const char *from, uptr size) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, strncat);
   ENSURE_MEMORO_INITED();
@@ -514,23 +521,24 @@ INTERCEPTOR(char*, strncat, char *to, const char *from, uptr size) {
     MEMORO_READ_STRING_OF_LEN(ctx, to, to_length, to_length);
     MEMORO_WRITE_RANGE(ctx, to + to_length, from_length + 1);
     if (from_length > 0) {
-      CHECK_RANGES_OVERLAP("strncat", to, to_length + copy_length + 1,
-                           from, copy_length);
+      CHECK_RANGES_OVERLAP("strncat", to, to_length + copy_length + 1, from,
+                           copy_length);
     }
   }
   return REAL(strncat)(to, from, size);
 }
 
-INTERCEPTOR(char*, strcpy, char *to, const char *from) {  // NOLINT
+INTERCEPTOR(char *, strcpy, char *to, const char *from) { // NOLINT
   void *ctx;
-  MEMORO_INTERCEPTOR_ENTER(ctx, strcpy);  // NOLINT
+  MEMORO_INTERCEPTOR_ENTER(ctx, strcpy); // NOLINT
 #if SANITIZER_MAC
-  if (UNLIKELY(!memoro_inited)) return REAL(strcpy)(to, from);  // NOLINT
+  if (UNLIKELY(!memoro_inited))
+    return REAL(strcpy)(to, from); // NOLINT
 #endif
   // strcpy is called from malloc_default_purgeable_zone()
   // in __memoro::ReplaceSystemAlloc() on Mac.
   if (memoro_init_is_running) {
-    return REAL(strcpy)(to, from);  // NOLINT
+    return REAL(strcpy)(to, from); // NOLINT
   }
   ENSURE_MEMORO_INITED();
   if (getFlags()->replace_str) {
@@ -539,13 +547,14 @@ INTERCEPTOR(char*, strcpy, char *to, const char *from) {  // NOLINT
     MEMORO_READ_RANGE(ctx, from, from_size);
     MEMORO_WRITE_RANGE(ctx, to, from_size);
   }
-  return REAL(strcpy)(to, from);  // NOLINT
+  return REAL(strcpy)(to, from); // NOLINT
 }
 
-INTERCEPTOR(char*, strdup, const char *s) {
+INTERCEPTOR(char *, strdup, const char *s) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, strdup);
-  if (UNLIKELY(!memoro_inited)) return internal_strdup(s);
+  if (UNLIKELY(!memoro_inited))
+    return internal_strdup(s);
   ENSURE_MEMORO_INITED();
   uptr length = REAL(strlen)(s);
   if (getFlags()->replace_str) {
@@ -555,14 +564,15 @@ INTERCEPTOR(char*, strdup, const char *s) {
   void *new_mem = memoro_malloc(length + 1, stack);
   MEMORO_WRITE_RANGE(ctx, new_mem, length + 1);
   REAL(memcpy)(new_mem, s, length + 1);
-  return reinterpret_cast<char*>(new_mem);
+  return reinterpret_cast<char *>(new_mem);
 }
 
 #if MEMORO_INTERCEPT___STRDUP
-INTERCEPTOR(char*, __strdup, const char *s) {
+INTERCEPTOR(char *, __strdup, const char *s) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, strdup);
-  if (UNLIKELY(!memoro_inited)) return internal_strdup(s);
+  if (UNLIKELY(!memoro_inited))
+    return internal_strdup(s);
   ENSURE_MEMORO_INITED();
   uptr length = REAL(strlen)(s);
   if (getFlags()->replace_str) {
@@ -571,11 +581,11 @@ INTERCEPTOR(char*, __strdup, const char *s) {
   GET_STACK_TRACE_MALLOC;
   void *new_mem = memoro_malloc(length + 1, stack);
   REAL(memcpy)(new_mem, s, length + 1);
-  return reinterpret_cast<char*>(new_mem);
+  return reinterpret_cast<char *>(new_mem);
 }
 #endif // MEMORO_INTERCEPT___STRDUP
 
-INTERCEPTOR(char*, strncpy, char *to, const char *from, uptr size) {
+INTERCEPTOR(char *, strncpy, char *to, const char *from, uptr size) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, strncpy);
   ENSURE_MEMORO_INITED();
@@ -588,7 +598,7 @@ INTERCEPTOR(char*, strncpy, char *to, const char *from, uptr size) {
   return REAL(strncpy)(to, from, size);
 }
 
-INTERCEPTOR(long, strtol, const char *nptr,  // NOLINT
+INTERCEPTOR(long, strtol, const char *nptr, // NOLINT
             char **endptr, int base) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, strtol);
@@ -597,7 +607,7 @@ INTERCEPTOR(long, strtol, const char *nptr,  // NOLINT
     return REAL(strtol)(nptr, endptr, base);
   }
   char *real_endptr;
-  long result = REAL(strtol)(nptr, &real_endptr, base);  // NOLINT
+  long result = REAL(strtol)(nptr, &real_endptr, base); // NOLINT
   StrtolFixAndCheck(ctx, nptr, endptr, real_endptr, base);
   return result;
 }
@@ -606,7 +616,8 @@ INTERCEPTOR(int, atoi, const char *nptr) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, atoi);
 #if SANITIZER_MAC
-  if (UNLIKELY(!memoro_inited)) return REAL(atoi)(nptr);
+  if (UNLIKELY(!memoro_inited))
+    return REAL(atoi)(nptr);
 #endif
   ENSURE_MEMORO_INITED();
   if (!getFlags()->replace_str) {
@@ -623,25 +634,26 @@ INTERCEPTOR(int, atoi, const char *nptr) {
   return result;
 }
 
-INTERCEPTOR(long, atol, const char *nptr) {  // NOLINT
+INTERCEPTOR(long, atol, const char *nptr) { // NOLINT
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, atol);
 #if SANITIZER_MAC
-  if (UNLIKELY(!memoro_inited)) return REAL(atol)(nptr);
+  if (UNLIKELY(!memoro_inited))
+    return REAL(atol)(nptr);
 #endif
   ENSURE_MEMORO_INITED();
   if (!getFlags()->replace_str) {
     return REAL(atol)(nptr);
   }
   char *real_endptr;
-  long result = REAL(strtol)(nptr, &real_endptr, 10);  // NOLINT
+  long result = REAL(strtol)(nptr, &real_endptr, 10); // NOLINT
   FixRealStrtolEndptr(nptr, &real_endptr);
   MEMORO_READ_STRING(ctx, nptr, (real_endptr - nptr) + 1);
   return result;
 }
 
 #if MEMORO_INTERCEPT_ATOLL_AND_STRTOLL
-INTERCEPTOR(long long, strtoll, const char *nptr,  // NOLINT
+INTERCEPTOR(long long, strtoll, const char *nptr, // NOLINT
             char **endptr, int base) {
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, strtoll);
@@ -650,12 +662,12 @@ INTERCEPTOR(long long, strtoll, const char *nptr,  // NOLINT
     return REAL(strtoll)(nptr, endptr, base);
   }
   char *real_endptr;
-  long long result = REAL(strtoll)(nptr, &real_endptr, base);  // NOLINT
+  long long result = REAL(strtoll)(nptr, &real_endptr, base); // NOLINT
   StrtolFixAndCheck(ctx, nptr, endptr, real_endptr, base);
   return result;
 }
 
-INTERCEPTOR(long long, atoll, const char *nptr) {  // NOLINT
+INTERCEPTOR(long long, atoll, const char *nptr) { // NOLINT
   void *ctx;
   MEMORO_INTERCEPTOR_ENTER(ctx, atoll);
   ENSURE_MEMORO_INITED();
@@ -663,12 +675,12 @@ INTERCEPTOR(long long, atoll, const char *nptr) {  // NOLINT
     return REAL(atoll)(nptr);
   }
   char *real_endptr;
-  long long result = REAL(strtoll)(nptr, &real_endptr, 10);  // NOLINT
+  long long result = REAL(strtoll)(nptr, &real_endptr, 10); // NOLINT
   FixRealStrtolEndptr(nptr, &real_endptr);
   MEMORO_READ_STRING(ctx, nptr, (real_endptr - nptr) + 1);
   return result;
 }
-#endif  // MEMORO_INTERCEPTA_ATOLL_AND_STRTOLL
+#endif // MEMORO_INTERCEPTA_ATOLL_AND_STRTOLL
 
 namespace __memoro {
 
@@ -679,8 +691,8 @@ void InitializeInterceptors() {
   was_called_once = true;
   InitializeCommonInterceptors();
   // Intercept str* functions.
-  MEMORO_INTERCEPT_FUNC(strcat);  // NOLINT
-  MEMORO_INTERCEPT_FUNC(strcpy);  // NOLINT
+  MEMORO_INTERCEPT_FUNC(strcat); // NOLINT
+  MEMORO_INTERCEPT_FUNC(strcpy); // NOLINT
   MEMORO_INTERCEPT_FUNC(wcslen);
   MEMORO_INTERCEPT_FUNC(strncat);
   MEMORO_INTERCEPT_FUNC(strncpy);

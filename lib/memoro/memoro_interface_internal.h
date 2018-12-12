@@ -1,4 +1,4 @@
-//===-- memoro_interface_internal.h -------------------------------*- C++ -*-===//
+//===-- memoro_interface_internal.h ---------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
