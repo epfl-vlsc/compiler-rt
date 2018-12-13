@@ -60,6 +60,7 @@ void TallyAllocationPoint(const MemoroStackAndChunks& sc, void* arg) {
   vec->push_back(sc);
 }
 
+// start timestamp to get relative chunk lifetimes
 static __sanitizer::u64 memoro_start;
 
 static void OnExit () {
@@ -71,6 +72,7 @@ static void OnExit () {
   __sanitizer::u64 end_ts = get_timestamp();
   ForEachChunk(AddStillAllocatedCb, &end_ts);
 
+  // sorting may not be necessary, considering removing
   MemoroStackDepot_SortAllChunkVectors();
 
   // making a copy of stack trace handles, pointed-to data
@@ -89,8 +91,8 @@ static void OnExit () {
 
     writer.WriteTrace(buf);
 
-    for (uptr j = 0; j < alloc_point.chunks->size(); j++) {
-      MemoroMemoryChunk &chunk = (*alloc_point.chunks)[j];
+    for (auto& chunk : *alloc_point.chunks) {
+      //MemoroMemoryChunk &chunk = (*alloc_point.chunks)[j];
       chunk.timestamp_start = chunk.timestamp_start - memoro_start;
       chunk.timestamp_end = chunk.timestamp_end - memoro_start;
       chunk.timestamp_first_access = chunk.timestamp_first_access > 0 ?
@@ -110,7 +112,7 @@ static void OnExit () {
 }
 
 
-extern "C" void __memoro_init(ToolType Tool, void *Ptr) {
+extern "C" void __memoro_init() {
   CHECK(!memoro_init_is_running);
   if (memoro_inited)
     return;
@@ -131,8 +133,6 @@ extern "C" void __memoro_init(ToolType Tool, void *Ptr) {
   Atexit(OnExit);
   memoro_start = get_timestamp();
 
-  //InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
-
   memoro_inited = true;
   memoro_init_is_running = false;
 }
@@ -143,7 +143,7 @@ void __sanitizer_print_stack_trace() {
   stack.Print();
 }
 
-void __memoro_exit(void *Ptr) {
+void __memoro_exit() {
 }
 
 void __memoro_aligned_load1(void *Addr) {
@@ -227,10 +227,10 @@ void __memoro_unaligned_storeN(void *Addr, __sanitizer::uptr Size) {
 }
 
 // Public interface:
+// stuart: these can probably be removed
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {
 
-  //reportResults();
 }
 
 SANITIZER_INTERFACE_ATTRIBUTE unsigned int __memoro_get_sample_count() {

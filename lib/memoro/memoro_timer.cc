@@ -25,9 +25,8 @@
 namespace __memoro {
 
 u64 get_timestamp() {
-  // before you get all uppity on me, recall that
-  // modern procs sync this counter across cores and
-  // correct for freq scaling
+  // modern procs should sync this counter across cores and
+  // correct for freq scaling, so this should be safe
   return __rdtsc();
 }
 

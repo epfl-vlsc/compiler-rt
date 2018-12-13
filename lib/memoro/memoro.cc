@@ -25,6 +25,9 @@ namespace __memoro {
 u64 total_hits = 0;
 u64 heap_hits = 0;
 
+// Detect if the memory (Addr) being accessed is on the heap by asking
+// the allocator. If it is, get the metadata for that heap chunk
+// and update access statistics
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   /*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
             IsWrite ? 'w' : 'r', Addr, Size);*/

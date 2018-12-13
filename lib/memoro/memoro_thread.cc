@@ -23,7 +23,6 @@
 namespace __memoro {
 
 static ThreadRegistry *thread_registry;
-static bool initialized;
 
 static ThreadContextBase *CreateThreadContext(u32 tid) {
   void *mem = MmapOrDie(sizeof(ThreadContext), "ThreadContext");
@@ -116,8 +115,6 @@ void EnsureMainThreadIDIsCorrect() {
   if (GetCurrentThread() == 0)
     CurrentThreadContext()->os_id = GetTid();
 }
-
-///// Interface to the common LSan module. /////
 
 bool GetThreadRangesLocked(uptr os_id, uptr *stack_begin, uptr *stack_end,
                            uptr *tls_begin, uptr *tls_end, uptr *cache_begin,

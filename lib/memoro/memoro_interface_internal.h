@@ -24,23 +24,14 @@
 
 extern "C" {
 
-// TODO find a use for a global like this or remove
-typedef enum Type : __sanitizer::u32 {
-  MEMORO_Test = 0,
-} ToolType;
-
-extern ToolType __memoro_which_tool;
-
 // This function should be called at the very beginning of the process,
 // before any instrumented code is executed and before any call to malloc.
-SANITIZER_INTERFACE_ATTRIBUTE void __memoro_init(ToolType Tool, void *Ptr);
-SANITIZER_INTERFACE_ATTRIBUTE void __memoro_exit(void *Ptr);
+SANITIZER_INTERFACE_ATTRIBUTE void __memoro_init();
+SANITIZER_INTERFACE_ATTRIBUTE void __memoro_exit();
 
 // The instrumentation module will insert a call to one of these routines prior
-// to each load and store instruction for which we do not have "fastpath"
-// inlined instrumentation.  These calls constitute the "slowpath" for our
-// tools.  We have separate routines for each type of memory access to enable
-// targeted optimization.
+// to each load and store instruction.
+// TODO investigate potential inlining?
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_aligned_load1(void *Addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_aligned_load2(void *Addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_aligned_load4(void *Addr);

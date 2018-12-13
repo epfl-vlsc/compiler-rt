@@ -290,8 +290,8 @@ void SetThreadName(const char *name) {
     memoroThreadRegistry().SetThreadName(t, name);
 }
 
+// should this direct to the main OnExit in memoro_interface.cc?
 int OnExit() {
-  // FIXME: ask frontend whether we need to return failure.
   return 0;
 }
 
@@ -411,7 +411,7 @@ extern "C" void *__memoro_thread_start_func(void *arg) {
   // destructor to run.
   if (pthread_setspecific(g_thread_finalize_key,
                           (void *)GetPthreadDestructorIterations())) {
-    Report("LeakSanitizer: failed to set thread key.\n");
+    Report("Memoro: failed to set thread key.\n");
     Die();
   }
   u32 tid = 0;
@@ -445,11 +445,11 @@ INTERCEPTOR(int, pthread_create, void *th, void *attr,
     // stored by pthread for future reuse even after thread destruction, and
     // the linked list it's stored in doesn't even hold valid pointers to the
     // objects, the latter are calculated by obscure pointer arithmetic.
+    // stuart: for memoro this may be an unneeded relic
     ScopedInterceptorDisabler disabler;
     res = REAL(pthread_create)(th, attr, __memoro_thread_start_func, &p);
   }
   if (res == 0) {
-    // TODO fix this pthread crap
     int tid = ThreadCreate(GetCurrentThread(), *(uptr *)th,
                            /*detached == PTHREAD_CREATE_DETACHED*/ false);
     CHECK_NE(tid, 0);
@@ -711,7 +711,6 @@ void InitializeInterceptors() {
   MEMORO_INTERCEPT_FUNC(atoll);
   MEMORO_INTERCEPT_FUNC(strtoll);
 #endif
-  // TODO add range access function interceptors (memset, etc. )
   INTERCEPT_FUNCTION(malloc);
   INTERCEPT_FUNCTION(free);
   MEMORO_MAYBE_INTERCEPT_CFREE;

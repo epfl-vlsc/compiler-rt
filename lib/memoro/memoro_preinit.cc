@@ -20,6 +20,5 @@
 // We force __memoro_init to be called before anyone else by placing it into
 // .preinit_array section.
 __attribute__((section(".preinit_array"),
-               used)) void (*__local_memoro_preinit)(ToolType,
-                                                     void *) = __memoro_init;
+               used)) void (*__local_memoro_preinit)() = __memoro_init;
 #endif

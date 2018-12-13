@@ -52,6 +52,7 @@ void DisableCounterUnderflow();
 bool DisabledInThisThread();
 
 // Used to implement __memoro::ScopedDisabler.
+// stuart: not sure if this is needed anymore
 void DisableInThisThread();
 void EnableInThisThread();
 // Can be used to ignore memory allocated by an intercepted
@@ -61,48 +62,12 @@ struct ScopedInterceptorDisabler {
   ~ScopedInterceptorDisabler() { EnableInThisThread(); }
 };
 
-// According to Itanium C++ ABI array cookie is a one word containing
-// size of allocated array.
-static inline bool IsItaniumABIArrayCookie(uptr chunk_beg, uptr chunk_size,
-                                           uptr addr) {
-  return chunk_size == sizeof(uptr) && chunk_beg + chunk_size == addr &&
-         *reinterpret_cast<uptr *>(chunk_beg) == 0;
-}
-
-// According to ARM C++ ABI array cookie consists of two words:
-// struct array_cookie {
-//   std::size_t element_size; // element_size != 0
-//   std::size_t element_count;
-// };
-static inline bool IsARMABIArrayCookie(uptr chunk_beg, uptr chunk_size,
-                                       uptr addr) {
-  return chunk_size == 2 * sizeof(uptr) && chunk_beg + chunk_size == addr &&
-         *reinterpret_cast<uptr *>(chunk_beg + sizeof(uptr)) == 0;
-}
-
-// Special case for "new T[0]" where T is a type with DTOR.
-// new T[0] will allocate a cookie (one or two words) for the array size (0)
-// and store a pointer to the end of allocated chunk. The actual cookie layout
-// varies between platforms according to their C++ ABI implementation.
-inline bool IsSpecialCaseOfOperatorNew0(uptr chunk_beg, uptr chunk_size,
-                                        uptr addr) {
-#if defined(__arm__)
-  return IsARMABIArrayCookie(chunk_beg, chunk_size, addr);
-#else
-  return IsItaniumABIArrayCookie(chunk_beg, chunk_size, addr);
-#endif
-}
-
-// The following must be implemented in the parent tool.
-
 void ForEachChunk(ForEachChunkCallback callback, void *arg);
 // Returns the address range occupied by the global allocator object.
 void GetAllocatorGlobalRange(uptr *begin, uptr *end);
 // Wrappers for allocator's ForceLock()/ForceUnlock().
 void LockAllocator();
 void UnlockAllocator();
-// Returns true if [addr, addr + sizeof(void *)) is poisoned.
-bool WordIsPoisoned(uptr addr);
 // Wrappers for ThreadRegistry access.
 void LockThreadRegistry();
 void UnlockThreadRegistry();
@@ -118,13 +83,8 @@ void ForEachExtraStackRange(uptr os_id, RangeIteratorCallback callback,
 // leak checking and also before every call to pthread_create() (to handle cases
 // where leak checking is initiated from a non-main thread).
 void EnsureMainThreadIDIsCorrect();
-// If p points into a chunk that has been allocated to the user, returns its
-// user-visible address. Otherwise, returns 0.
-uptr PointsIntoChunk(void *p);
 // Returns address of user-visible chunk contained in this allocator chunk.
 uptr GetUserBegin(uptr chunk);
-// Helper for __memoro_ignore_object().
-IgnoreObjectResult IgnoreObjectLocked(const void *p);
 
 // Return the linker module, if valid for the platform.
 LoadedModule *GetLinker();
@@ -160,6 +120,7 @@ public:
 
 } // namespace __memoro
 
+// stuart: Not sure if these are needed
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE int
 __memoro_is_turned_off();
