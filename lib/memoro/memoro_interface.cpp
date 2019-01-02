@@ -51,7 +51,8 @@ void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
     newchunk.multi_thread = m.multi_thread();
     newchunk.access_interval_low = m.interval_low();
     newchunk.access_interval_high = m.interval_high();
-    sl.chunks->push_back(newchunk);
+    //sl.chunks->push_back(newchunk);
+    sl.PushChunk(newchunk);
   }
 }
 

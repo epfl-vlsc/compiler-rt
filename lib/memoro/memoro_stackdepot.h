@@ -53,11 +53,20 @@ typedef InternalMmapVectorNoCtor<MemoroMemoryChunk> ChunkVec;
 struct MemoroStackAndChunks {
   StackTrace st;
   ChunkVec *chunks;
+  SpinMutex *lock;
 
-  MemoroStackAndChunks() : chunks(nullptr) {}
-  MemoroStackAndChunks(const StackTrace &_st) : st(_st), chunks(nullptr) {}
+  MemoroStackAndChunks() : chunks(nullptr), lock(nullptr) {}
+  MemoroStackAndChunks(const StackTrace &_st) : st(_st), chunks(nullptr), lock(nullptr) {}
   MemoroStackAndChunks(const StackTrace &_st, ChunkVec *_chunks)
-      : st(_st), chunks(_chunks) {}
+      : st(_st), chunks(_chunks), lock(nullptr) {}
+  MemoroStackAndChunks(const StackTrace &_st, ChunkVec *_chunks, SpinMutex *_lock)
+      : st(_st), chunks(_chunks), lock(_lock) {}
+
+  void PushChunk(const MemoroMemoryChunk& chunk) {
+    lock->Lock();
+    chunks->push_back(chunk);
+    lock->Unlock();
+  }
 };
 
 // StackDepot efficiently stores huge amounts of stack traces.

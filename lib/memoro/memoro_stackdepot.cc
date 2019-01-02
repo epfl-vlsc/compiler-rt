@@ -25,6 +25,7 @@ struct MemoroStackDepotNode {
   atomic_uint32_t hash_and_use_count; // hash_bits : 12; use_count : 20;
   u32 size;
   u32 tag;
+  SpinMutex lock;
   // memoro stats
   ChunkVec *chunk_vec = nullptr;
   uptr stack[1]; // [size]
@@ -89,8 +90,8 @@ struct MemoroStackDepotNode {
     chunk_vec->Initialize(128); // hopefully not too big? or too small?
     internal_memcpy(stack, st.trace, size * sizeof(uptr));
   }
-  args_type load() const {
-    return args_type(StackTrace(&stack[0], size, tag), chunk_vec);
+  args_type load() {
+    return args_type(StackTrace(&stack[0], size, tag), chunk_vec, &lock);
   }
   MemoroStackDepotHandle get_handle() { return MemoroStackDepotHandle(this); }
 

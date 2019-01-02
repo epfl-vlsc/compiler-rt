@@ -107,7 +107,8 @@ static void RegisterDeallocation(void *p) {
   chunk.multi_thread = m->multi_thread;
   chunk.access_interval_low = m->access_interval_low;
   chunk.access_interval_high = m->access_interval_high;
-  sl.chunks->push_back(chunk);
+  //sl.chunks->push_back(chunk);
+  sl.PushChunk(chunk);
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
