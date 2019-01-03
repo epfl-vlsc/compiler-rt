@@ -63,9 +63,8 @@ struct MemoroStackAndChunks {
       : st(_st), chunks(_chunks), lock(_lock) {}
 
   void PushChunk(const MemoroMemoryChunk& chunk) {
-    lock->Lock();
+    SpinMutexLock l(lock);
     chunks->push_back(chunk);
-    lock->Unlock();
   }
 };
 
