@@ -291,9 +291,7 @@ void SetThreadName(const char *name) {
 }
 
 // should this direct to the main OnExit in memoro_interface.cc?
-int OnExit() {
-  return 0;
-}
+int OnExit() { return 0; }
 
 struct MemoroInterceptorContext {
   const char *interceptor_name;

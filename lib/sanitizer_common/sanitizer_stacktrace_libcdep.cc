@@ -55,7 +55,7 @@ void StackTrace::Print() const {
     Printf("DEDUP_TOKEN: %s\n", dedup_token.data());
 }
 
-void StackTrace::SPrint(char * str, uptr len, const char* format) const {
+void StackTrace::SPrint(char *str, uptr len, const char *format) const {
   if (trace == nullptr || size == 0) {
     Printf("    <empty stack>\n\n");
     return;
@@ -71,9 +71,9 @@ void StackTrace::SPrint(char * str, uptr len, const char* format) const {
     SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
     CHECK(frames);
     for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
-      //frame_desc.clear();
-      RenderFrame(&frame_desc, format, frame_num++,
-                  cur->info, common_flags()->symbolize_vs_style,
+      // frame_desc.clear();
+      RenderFrame(&frame_desc, format, frame_num++, cur->info,
+                  common_flags()->symbolize_vs_style,
                   common_flags()->strip_path_prefix);
       if (dedup_frames-- > 0) {
         if (dedup_token.length())

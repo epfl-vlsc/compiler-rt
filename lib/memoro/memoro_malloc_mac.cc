@@ -38,11 +38,11 @@ using namespace __memoro;
 #define COMMON_MALLOC_CALLOC(count, size)                                      \
   GET_STACK_TRACE_MALLOC;                                                      \
   void *p = memoro_calloc(count, size, stack)
-#define COMMON_MALLOC_POSIX_MEMALIGN(memptr, alignment, size) \
-  GET_STACK_TRACE_MALLOC; \
+#define COMMON_MALLOC_POSIX_MEMALIGN(memptr, alignment, size)                  \
+  GET_STACK_TRACE_MALLOC;                                                      \
   int res = memoro_posix_memalign(memptr, alignment, size, stack);
-#define COMMON_MALLOC_VALLOC(size) \
-  GET_STACK_TRACE_MALLOC; \
+#define COMMON_MALLOC_VALLOC(size)                                             \
+  GET_STACK_TRACE_MALLOC;                                                      \
   void *p = memoro_memalign(GetPageSizeCached(), size, stack);
 #define COMMON_MALLOC_FREE(ptr) memoro_free(ptr)
 #define COMMON_MALLOC_SIZE(ptr) uptr size = memoro_mz_size(ptr)

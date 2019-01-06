@@ -24,8 +24,6 @@
 
 namespace __memoro {
 
-//const u16 MAX_INDEX_SIZE = u16(1 << 16);
-
 struct __attribute__((packed)) Header {
   u8 version_major = 0;
   u8 version_minor = 1;

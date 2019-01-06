@@ -102,11 +102,11 @@ typedef SizeClassAllocator64<AP64> PrimaryAllocator;
 #else // Fallback to SizeClassAllocator32.
 static const uptr kRegionSizeLog = 20;
 static const uptr kNumRegions = SANITIZER_MMAP_RANGE_SIZE >> kRegionSizeLog;
-# if SANITIZER_WORDSIZE == 32
+#if SANITIZER_WORDSIZE == 32
 typedef FlatByteMap<kNumRegions> ByteMap;
-# elif SANITIZER_WORDSIZE == 64
+#elif SANITIZER_WORDSIZE == 64
 typedef TwoLevelByteMap<(kNumRegions >> 12), 1 << 12> ByteMap;
-# endif
+#endif
 typedef CompactSizeClassMap SizeClassMap;
 struct AP32 {
   static const uptr kSpaceBeg = 0;
