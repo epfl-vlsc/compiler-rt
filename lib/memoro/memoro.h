@@ -53,7 +53,7 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
   do {                                                                         \
     CHECK(!memoro_init_is_running);                                            \
     if (!memoro_inited)                                                        \
-      __memoro_init();                                     \
+      __memoro_init();                                                         \
   } while (0)
 
 extern u64 total_hits;

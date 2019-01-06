@@ -55,7 +55,7 @@ struct StackTrace {
 
   // Prints a symbolized stacktrace, followed by an empty line.
   void Print() const;
-  void SPrint(char * str, uptr len, const char* format) const;
+  void SPrint(char *str, uptr len, const char *format) const;
 
   static bool WillUseFastUnwind(bool request_fast_unwind) {
     if (!SANITIZER_CAN_FAST_UNWIND)

@@ -14,13 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sanitizer_common/sanitizer_errno_codes.h"
 #include "memoro_allocator.h"
 #include "memoro_stackdepot.h"
 #include "memoro_thread.h"
 #include "memoro_timer.h"
-#include "sanitizer_common/sanitizer_allocator_interface.h"
 #include "sanitizer_common/sanitizer_allocator_checks.h"
+#include "sanitizer_common/sanitizer_allocator_interface.h"
+#include "sanitizer_common/sanitizer_errno_codes.h"
 
 extern "C" void *memset(void *ptr, int value, uptr num);
 
@@ -170,7 +170,7 @@ void *memoro_memalign(uptr alignment, uptr size, const StackTrace &stack) {
 }
 
 int memoro_posix_memalign(void **memptr, uptr alignment, uptr size,
-                        const StackTrace &stack) {
+                          const StackTrace &stack) {
   if (UNLIKELY(!CheckPosixMemalignAlignment(alignment))) {
     if (AllocatorMayReturnNull())
       return errno_EINVAL;
