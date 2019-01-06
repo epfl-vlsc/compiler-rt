@@ -55,6 +55,37 @@ void StackTrace::Print() const {
     Printf("DEDUP_TOKEN: %s\n", dedup_token.data());
 }
 
+void StackTrace::SPrint(char *str, uptr len, const char *format) const {
+  if (trace == nullptr || size == 0) {
+    Printf("    <empty stack>\n\n");
+    return;
+  }
+  InternalScopedString frame_desc(GetPageSizeCached() * 4);
+  InternalScopedString dedup_token(GetPageSizeCached());
+  int dedup_frames = common_flags()->dedup_token_length;
+  uptr frame_num = 0;
+  for (uptr i = 0; i < size && trace[i]; i++) {
+    // PCs in stack traces are actually the return addresses, that is,
+    // addresses of the next instructions after the call.
+    uptr pc = GetPreviousInstructionPc(trace[i]);
+    SymbolizedStack *frames = Symbolizer::GetOrInit()->SymbolizePC(pc);
+    CHECK(frames);
+    for (SymbolizedStack *cur = frames; cur; cur = cur->next) {
+      // frame_desc.clear();
+      RenderFrame(&frame_desc, format, frame_num++, cur->info,
+                  common_flags()->symbolize_vs_style,
+                  common_flags()->strip_path_prefix);
+      if (dedup_frames-- > 0) {
+        if (dedup_token.length())
+          dedup_token.append("--");
+        dedup_token.append(cur->info.function);
+      }
+    }
+    frames->ClearAll();
+  }
+  internal_strlcpy(str, frame_desc.data(), len);
+}
+
 void BufferedStackTrace::Unwind(u32 max_depth, uptr pc, uptr bp, void *context,
                                 uptr stack_top, uptr stack_bottom,
                                 bool request_fast_unwind) {

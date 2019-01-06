@@ -424,6 +424,7 @@ namespace __asan  { using namespace __sanitizer; }  // NOLINT
 namespace __dsan  { using namespace __sanitizer; }  // NOLINT
 namespace __dfsan { using namespace __sanitizer; }  // NOLINT
 namespace __esan  { using namespace __sanitizer; }  // NOLINT
+namespace __memoro { using namespace __sanitizer; } // NOLINT
 namespace __lsan  { using namespace __sanitizer; }  // NOLINT
 namespace __msan  { using namespace __sanitizer; }  // NOLINT
 namespace __hwasan  { using namespace __sanitizer; }  // NOLINT
