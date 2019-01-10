@@ -112,6 +112,7 @@ typedef FlatByteMap<kNumRegions> ByteMap;
 typedef TwoLevelByteMap<(kNumRegions >> 12), 1 << 12> ByteMap;
 #endif
 typedef CompactSizeClassMap SizeClassMap;
+template <typename AddressSpaceViewTy>
 struct AP32 {
   static const uptr kSpaceBeg = 0;
   static const u64 kSpaceSize = SANITIZER_MMAP_RANGE_SIZE;
@@ -120,6 +121,7 @@ struct AP32 {
   static const uptr kRegionSizeLog = __memoro::kRegionSizeLog;
   typedef __memoro::ByteMap ByteMap;
   typedef NoOpMapUnmapCallback MapUnmapCallback;
+  typedef AddressSpaceViewTy AddressSpaceView;
   static const uptr kFlags = 0;
 };
 typedef SizeClassAllocator32<AP32> PrimaryAllocator;
