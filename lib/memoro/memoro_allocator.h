@@ -124,7 +124,7 @@ struct AP32 {
   typedef AddressSpaceViewTy AddressSpaceView;
   static const uptr kFlags = 0;
 };
-typedef SizeClassAllocator32<AP32> PrimaryAllocator;
+typedef SizeClassAllocator32<AP32<LocalAddressSpaceView>> PrimaryAllocator;
 #endif // SANITIZER_CAN_USE_ALLOCATOR64
 typedef SizeClassAllocatorLocalCache<PrimaryAllocator> AllocatorCache;
 
