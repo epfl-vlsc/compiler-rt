@@ -130,60 +130,54 @@ bool TraceWriter::OutputFiles() {
   internal_snprintf(namebuf, 4096, "%s-%d.trace", GetProcessName(), pid);
   // Printf("Trace file written to --> %s \n", namebuf);
 
-  uptr bytes_written, total_written = 0;
   fd_t memoro_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
-  WriteToFile(memoro_outfile, reinterpret_cast<char *>(&header), sizeof(Header),
-              &bytes_written);
-  total_written += bytes_written;
-  if (bytes_written != sizeof(Header)) {
+  if (memoro_outfile == kInvalidFd) {
+    Printf("open trace file failed!");
+    return false;
+  }
+
+  if (!WriteLargeBufferToFile(memoro_outfile, reinterpret_cast<char *>(&header), sizeof(Header))) {
     Printf("write header failed!!");
     return false;
   }
-  WriteToFile(memoro_outfile, trace_index, trace_index_position,
-              &bytes_written);
-  total_written += bytes_written;
-  if (bytes_written != trace_index_position) {
+
+  if (!WriteLargeBufferToFile(memoro_outfile, trace_index, trace_index_position)) {
     Printf("write trace index failed!!");
     return false;
   }
-  WriteToFile(memoro_outfile, trace_data, trace_data_position, &bytes_written);
-  total_written += bytes_written;
-  if (bytes_written != trace_data_position) {
+
+  if (!WriteLargeBufferToFile(memoro_outfile, trace_data, trace_data_position)) {
     Printf("write trace data failed!!");
     return false;
   }
-  CloseFile(memoro_outfile);
 
-  // Printf("total trace: %d \n", total_written);
-  total_written = 0;
+  CloseFile(memoro_outfile);
 
   header.index_size = chunk_index_size;
   internal_snprintf(namebuf, 4096, "%s-%d.chunks", GetProcessName(), pid);
   // Printf("Chunks file written to --> %s \n", namebuf);
 
   memoro_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
-  WriteToFile(memoro_outfile, reinterpret_cast<char *>(&header), sizeof(Header),
-              &bytes_written);
-  total_written += bytes_written;
-  if (bytes_written != sizeof(Header)) {
+  if (memoro_outfile == kInvalidFd) {
+    Printf("open chunks file failed!");
+    return false;
+  }
+
+  if (!WriteLargeBufferToFile(memoro_outfile, reinterpret_cast<char *>(&header), sizeof(Header))) {
     Printf("write chunk header failed!!");
     return false;
   }
-  // Printf("writing %d bytes to file\n", chunk_index_position);
-  WriteToFile(memoro_outfile, chunk_index, chunk_index_position,
-              &bytes_written);
-  total_written += bytes_written;
-  if (bytes_written != chunk_index_position) {
+
+  if (!WriteLargeBufferToFile(memoro_outfile, chunk_index, chunk_index_position)) {
     Printf("write chunk index failed!!");
     return false;
   }
-  // Printf("writing %d bytes to file\n", chunk_data_position);
-  WriteToFile(memoro_outfile, chunk_data, chunk_data_position, &bytes_written);
-  total_written += bytes_written;
-  if (bytes_written != chunk_data_position) {
+
+  if (!WriteLargeBufferToFile(memoro_outfile, chunk_data, chunk_data_position)) {
     Printf("write chunk data failed!!");
     return false;
   }
+
   CloseFile(memoro_outfile);
 
   return true;
@@ -192,6 +186,19 @@ bool TraceWriter::OutputFiles() {
 TraceWriter::~TraceWriter() {
   UnmapOrDie(trace_data, trace_data_length);
   UnmapOrDie(chunk_data, chunk_data_length);
+}
+
+bool TraceWriter::WriteLargeBufferToFile(const fd_t outfile, const char *buffer, const u64 buffer_size) {
+  uptr bytes_written = 0, total_written = 0;
+
+  while (total_written < buffer_size) {
+    if (!WriteToFile(outfile, buffer + total_written, buffer_size - total_written, &bytes_written))
+      return false;
+
+    total_written += bytes_written;
+  }
+
+  return true;
 }
 
 void TraceWriter::resize(char *&data, u64 &length) {
