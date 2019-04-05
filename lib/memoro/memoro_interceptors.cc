@@ -48,40 +48,60 @@ DECLARE_REAL_AND_INTERCEPTOR(void *, malloc, uptr)
 DECLARE_REAL_AND_INTERCEPTOR(void, free, void *)
 
 #if !SANITIZER_MAC
+
+static uptr allocated_for_dlsym;
+static const uptr kDlsymAllocPoolSize = 1024;
+static uptr alloc_memory_for_dlsym[kDlsymAllocPoolSize];
+
+static bool IsInDlsymAllocPool(const void *ptr) {
+  uptr off = (uptr)ptr - (uptr)alloc_memory_for_dlsym;
+  return off < sizeof(alloc_memory_for_dlsym);
+}
+
+static void *AllocateFromLocalPool(uptr size_in_bytes) {
+  uptr size_in_words = RoundUpTo(size_in_bytes, kWordSize) / kWordSize;
+  void *mem = (void*)&alloc_memory_for_dlsym[allocated_for_dlsym];
+  allocated_for_dlsym += size_in_words;
+  CHECK_LT(allocated_for_dlsym, kDlsymAllocPoolSize);
+  return mem;
+}
+
 INTERCEPTOR(void *, malloc, uptr size) {
+  if (UNLIKELY(!memoro_inited))
+    // Hack: dlsym calls malloc before REAL(malloc) is retrieved from dlsym.
+    return AllocateFromLocalPool(size);
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_malloc(size, stack);
 }
 
 INTERCEPTOR(void, free, void *p) {
+  if (UNLIKELY(IsInDlsymAllocPool(p)))
+    return;
   ENSURE_MEMORO_INITED();
   memoro_free(p);
 }
 
 INTERCEPTOR(void *, calloc, uptr nmemb, uptr size) {
-  if (memoro_init_is_running) {
+  if (UNLIKELY(!memoro_inited))
     // Hack: dlsym calls calloc before REAL(calloc) is retrieved from dlsym.
-    const uptr kCallocPoolSize = 1024;
-    static uptr calloc_memory_for_dlsym[kCallocPoolSize];
-    static uptr allocated;
-    uptr size_in_words = ((nmemb * size) + kWordSize - 1) / kWordSize;
-    void *mem = (void *)&calloc_memory_for_dlsym[allocated];
-    allocated += size_in_words;
-    CHECK(allocated < kCallocPoolSize);
-    return mem;
-  }
-  if (CheckForCallocOverflow(size, nmemb))
-    return nullptr;
+    return AllocateFromLocalPool(nmemb * size);
   ENSURE_MEMORO_INITED();
   GET_STACK_TRACE_MALLOC;
   return memoro_calloc(nmemb, size, stack);
 }
 
-INTERCEPTOR(void *, realloc, void *q, uptr size) {
-  ENSURE_MEMORO_INITED();
+INTERCEPTOR(void *, realloc, void *ptr, uptr size) {
   GET_STACK_TRACE_MALLOC;
-  return memoro_realloc(q, size, stack);
+  if (UNLIKELY(IsInDlsymAllocPool(ptr))) {
+    uptr offset = (uptr)ptr - (uptr)alloc_memory_for_dlsym;
+    uptr copy_size = Min(size, kDlsymAllocPoolSize - offset);
+    void *new_ptr = memoro_malloc(size, stack);
+    internal_memcpy(new_ptr, ptr, copy_size);
+    return new_ptr;
+  }
+  ENSURE_MEMORO_INITED();
+  return memoro_realloc(ptr, size, stack);
 }
 
 INTERCEPTOR(int, posix_memalign, void **memptr, uptr alignment, uptr size) {
