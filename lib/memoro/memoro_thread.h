@@ -48,7 +48,7 @@ void InitializeThreadRegistry();
 // Returns a single instance of registry.
 ThreadRegistry &memoroThreadRegistry();
 
-void ThreadStart(u32 tid, uptr os_id);
+void ThreadStart(u32 tid, uptr os_id, bool workerthread = false);
 void ThreadFinish();
 u32 ThreadCreate(u32 tid, uptr uid, bool detached);
 void ThreadJoin(u32 tid);

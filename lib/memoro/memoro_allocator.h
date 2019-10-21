@@ -36,9 +36,9 @@ template <typename Callable> void ForEachChunk(const Callable &callback);
 void GetAllocatorCacheRange(uptr *begin, uptr *end);
 void AllocatorThreadFinish();
 void InitializeAllocator();
-bool PointerIsAllocator(void *p);
+void PrintStats();
 
-void *GetBlockBegin(void *p);
+void *GetBlockBegin(const void *p, bool *is_primary = nullptr);
 
 const bool kAlwaysClearMemory = true;
 

@@ -12,6 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <climits>
+
 #include "memoro_flags.h"
 
 namespace __memoro {
@@ -63,6 +65,9 @@ void InitializeFlags() {
     ReportUnrecognizedFlags();
   if (common_flags()->help)
     Parser.PrintFlagDescriptions();
+
+  if (F->access_sampling_rate < 1)
+    F->access_sampling_rate = INT_MAX;
 
   __sanitizer_set_report_path(common_flags()->log_path);
 }

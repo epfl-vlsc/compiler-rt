@@ -17,6 +17,7 @@
 #include "memoro_interface_internal.h"
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
+#include "sanitizer_common/sanitizer_atomic.h"
 
 #define GET_STACK_TRACE(max_size, fast)                                        \
   BufferedStackTrace stack;                                                    \
@@ -56,8 +57,22 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
       __memoro_init();                                                         \
   } while (0)
 
-extern u64 total_hits;
-extern u64 heap_hits;
+extern atomic_uint64_t total_hits;
+extern atomic_uint64_t stack_hits;
+extern atomic_uint64_t sample_hits;
+extern atomic_uint64_t primary_hits;
+extern atomic_uint64_t allocators_hits;
+extern atomic_uint64_t primary_time;
+extern atomic_uint64_t allocators_time;
+extern atomic_uint64_t update_time;
+
+#define MEMORO_METRICS
+
+#ifdef MEMORO_METRICS
+#define MEMORO_METRIC_ADD(atomic_var, val) (atomic_fetch_add(&(atomic_var), (val), memory_order_relaxed))
+#else
+#define MEMORO_METRIC_ADD(atomic_var, val)
+#endif
 } // namespace __memoro
 
 extern bool memoro_inited;

@@ -18,12 +18,21 @@
 #include "memoro_allocator.h"
 #include "memoro_thread.h"
 #include "memoro_timer.h"
-#include "sanitizer_common/sanitizer_flag_parser.h"
+#include "memoro_flags.h"
 
 namespace __memoro {
 
-u64 total_hits = 0;
-u64 heap_hits = 0;
+atomic_uint64_t total_hits;
+
+atomic_uint64_t stack_hits;
+atomic_uint64_t sample_hits;
+
+atomic_uint64_t primary_hits;
+atomic_uint64_t allocators_hits;
+
+atomic_uint64_t primary_time;
+atomic_uint64_t allocators_time;
+atomic_uint64_t update_time;
 
 // Detect if the memory (Addr) being accessed is on the heap by asking
 // the allocator. If it is, get the metadata for that heap chunk
@@ -32,12 +41,28 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   /*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
             IsWrite ? 'w' : 'r', Addr, Size);*/
 
-  total_hits++;
-  void *p = (void *)Addr;
-  if (PointerIsAllocator(p)) {
-    heap_hits++;
-    MemoroMetadata m(Addr);
+  MEMORO_METRIC_ADD(total_hits, 1);
+
+  if (!getFlags()->register_accesses)
+    return;
+
+  // Sample accesses
+  if (atomic_fetch_add(&sample_hits, 1, memory_order_acq_rel) % getFlags()->access_sampling_rate != 0)
+    return;
+
+  bool is_primary = true;
+  u64 start = get_timestamp();
+  if (uptr p = (uptr)GetBlockBegin((void*)Addr, &is_primary)) {
+    MemoroMetadata m(p);
     u64 ts = get_timestamp();
+
+    MEMORO_METRIC_ADD(allocators_hits, 1);
+    MEMORO_METRIC_ADD(allocators_time, ts - start);
+    if (is_primary) {
+      MEMORO_METRIC_ADD(primary_hits, 1);
+      MEMORO_METRIC_ADD(primary_time, ts - start);
+    }
+
     if (m.first_timestamp() == 0)
       m.set_first_timestamp(ts);
 
@@ -50,7 +75,7 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 
     // TODO make optional
     // use uptr for arithmetic
-    uptr begin = (uptr)GetBlockBegin(p);
+    uptr begin = (uptr)p;
     if (Addr - begin < m.interval_low())
       m.set_interval_low(Addr - begin);
     if (Addr - begin + Size > m.interval_high())
@@ -58,10 +83,14 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 
     // this is prob expensive because GetCurrentThread locks
     // TODO make optional
-    if (GetCurrentThread() != m.creating_thread()) {
+    if (getFlags()->register_multi_thread && GetCurrentThread() != m.creating_thread()) {
       m.set_multi_thread();
     }
+
+    return;
   }
+  u64 ts = get_timestamp();
+  MEMORO_METRIC_ADD(update_time, ts - start);
 }
 
 } // namespace __memoro

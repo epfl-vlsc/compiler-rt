@@ -54,5 +54,5 @@ if(COMPILER_RT_BUILD_LIBFUZZER)
 endif()
 
 if(COMPILER_RT_BUILD_MEMORO)
-    compiler_rt_build_runtime(memoro)
+  compiler_rt_build_runtime(memoro)
 endif()

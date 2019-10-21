@@ -31,7 +31,6 @@ using namespace __memoro; // NOLINT
 void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
 
   __sanitizer::u64 end_ts = *(__sanitizer::u64 *)arg;
-  chunk = GetUserBegin(chunk);
   MemoroMetadata m(chunk);
   // at the end, we only care about chunks that are still allocated
   if (m.allocated()) {
@@ -49,7 +48,8 @@ void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
     newchunk.multi_thread = m.multi_thread();
     newchunk.access_interval_low = m.interval_low();
     newchunk.access_interval_high = m.interval_high();
-    sl.chunks->push_back(newchunk);
+    /* sl.chunks->push_back(newchunk); */
+    sl.PushChunk(newchunk);
   }
 }
 
@@ -60,10 +60,18 @@ void TallyAllocationPoint(const MemoroStackAndChunks &sc, void *arg) {
 
 // start timestamp to get relative chunk lifetimes
 static __sanitizer::u64 memoro_start;
-
+extern "C" { void __memoro_report(); }
 static void OnExit() {
-  if (getFlags()->no_output)
+  __memoro_report();
+
+  Flags *flags = getFlags();
+  if (flags->no_output)
     return;
+
+  // Make sure we don't collect data anymore as
+  // the symbolizer can be compiled with Memoro
+  flags->register_allocs = false;
+  flags->register_accesses = false;
 
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
@@ -99,6 +107,9 @@ static void OnExit() {
       if (chunk.access_interval_high != 0 &&
           chunk.access_interval_high - chunk.access_interval_low > chunk.size)
         Printf("WARNING: chunk had access interval larger than size\n");
+      // Clear 0xffffffff from chunk.access_interval_low if there was no read
+      if (chunk.num_reads == 0 && chunk.num_writes == 0)
+        chunk.access_interval_low = chunk.access_interval_high = 0;
 
       writer.WriteChunk(chunk, i);
     }
@@ -118,6 +129,7 @@ extern "C" void __memoro_init() {
   AvoidCVE_2016_2143();
   InitializeFlags();
   InitializeAllocator();
+  InitializeDepotLock();
   ReplaceSystemMalloc();
   InitTlsSize();
   InitializeInterceptors();
@@ -223,9 +235,19 @@ void __memoro_unaligned_storeN(void *Addr, __sanitizer::uptr Size) {
 // Public interface:
 // stuart: these can probably be removed
 extern "C" {
-SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {}
+SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {
+  Printf("=== MEMORO REPORT ===\n");
+  Printf("Total hits: %zd\n", atomic_load_relaxed(&total_hits));
+  Printf("Stack/Sample hits: %zd/%zd\n", atomic_load_relaxed(&stack_hits), atomic_load_relaxed(&sample_hits));
+  Printf("Primary/Allocators hits: %zd/%zd\n", atomic_load_relaxed(&primary_hits), atomic_load_relaxed(&allocators_hits));
+  Printf("Primary/Allocators time: %zd/%zd\n", atomic_load_relaxed(&primary_time), atomic_load_relaxed(&allocators_time));
+  Printf("Total update time: %zd\n", atomic_load_relaxed(&update_time));
+  PrintStats();
+}
 
 SANITIZER_INTERFACE_ATTRIBUTE unsigned int __memoro_get_sample_count() {
   return 0;
 }
+
+SANITIZER_INTERFACE_ATTRIBUTE Flags* __memoro_get_flags() { return getFlags(); }
 } // extern "C"

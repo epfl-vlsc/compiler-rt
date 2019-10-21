@@ -32,7 +32,6 @@ public:
   void WriteTrace(const uptr *trace, u32 sz);
 
   void WriteChunk(MemoroMemoryChunk &chunk, u32 trace_index);
-  bool WriteLargeBufferToFile(const fd_t outfile, const char *buffer, const u64 buffer_size);
 
   // write out the trace and chunk buffers to file
   bool OutputFiles();
@@ -40,6 +39,7 @@ public:
 private:
   typedef u16 RelativeIndex;
 
+  bool WriteLargeBufferToFile(const fd_t outfile, const char *buffer, const u64 buffer_size);
   void resize(char *&data, u64 &length);
   char *trace_index;
   char *chunk_index;
