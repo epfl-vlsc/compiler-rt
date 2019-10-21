@@ -20,6 +20,8 @@
 #include "memoro_timer.h"
 #include "memoro_flags.h"
 
+#include <alloca.h>
+
 namespace __memoro {
 
 atomic_uint64_t total_hits;
@@ -33,6 +35,9 @@ atomic_uint64_t allocators_hits;
 atomic_uint64_t primary_time;
 atomic_uint64_t allocators_time;
 atomic_uint64_t update_time;
+atomic_uint64_t filter_time;
+
+THREADLOCAL uptr sample_hits_noatomic;
 
 // Detect if the memory (Addr) being accessed is on the heap by asking
 // the allocator. If it is, get the metadata for that heap chunk
@@ -41,29 +46,42 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   /*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
             IsWrite ? 'w' : 'r', Addr, Size);*/
 
-  MEMORO_METRIC_ADD(total_hits, 1);
-
-  if (!getFlags()->register_accesses)
+  const int sampling_rate = getFlags()->access_sampling_rate;
+  if (UNLIKELY(sampling_rate == 0))
     return;
 
+  MEMORO_METRIC_ADD(total_hits, 1);
+
+  u64 start_filter /* = get_timestamp() */;
+  uptr rsp = (uptr)alloca(0);
+  if (rsp <= Addr && Addr < GetCurrentStackEnd()) {
+    MEMORO_METRIC_ADD(filter_time, get_timestamp() - start_filter);
+    MEMORO_METRIC_ADD(stack_hits, 1);
+    return;
+  }
+  MEMORO_METRIC_ADD(filter_time, get_timestamp() - start_filter);
+
+  MEMORO_METRIC_ADD(sample_hits, 1);
+
   // Sample accesses
-  if (atomic_fetch_add(&sample_hits, 1, memory_order_acq_rel) % getFlags()->access_sampling_rate != 0)
+  if (LIKELY(sample_hits_noatomic++ % sampling_rate != 0))
     return;
 
   bool is_primary = true;
-  u64 start = get_timestamp();
-  if (uptr p = (uptr)GetBlockBegin((void*)Addr, &is_primary)) {
+  u64 start /* = get_timestamp() */;
+  uptr p = (uptr)GetBlockBegin((void*)Addr, &is_primary);
+  if (LIKELY(p)) {
     MemoroMetadata m(p);
     u64 ts = get_timestamp();
 
     MEMORO_METRIC_ADD(allocators_hits, 1);
     MEMORO_METRIC_ADD(allocators_time, ts - start);
-    if (is_primary) {
+    if (LIKELY(is_primary)) {
       MEMORO_METRIC_ADD(primary_hits, 1);
       MEMORO_METRIC_ADD(primary_time, ts - start);
     }
 
-    if (m.first_timestamp() == 0)
+    if (UNLIKELY(m.first_timestamp() == 0))
       m.set_first_timestamp(ts);
 
     m.set_latest_timestamp(ts);
@@ -83,14 +101,18 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 
     // this is prob expensive because GetCurrentThread locks
     // TODO make optional
-    if (getFlags()->register_multi_thread && GetCurrentThread() != m.creating_thread()) {
+    if (UNLIKELY(getFlags()->register_multi_thread && GetCurrentThread() != m.creating_thread())) {
       m.set_multi_thread();
     }
 
     return;
   }
-  u64 ts = get_timestamp();
-  MEMORO_METRIC_ADD(update_time, ts - start);
+  MEMORO_METRIC_ADD(update_time, get_timestamp() - start);
+}
+
+void checkStackAccess(void* Addr) {
+  if (getFlags()->check_stack_accesses)
+    CHECK(GetBlockBegin(Addr, nullptr) == nullptr);
 }
 
 } // namespace __memoro

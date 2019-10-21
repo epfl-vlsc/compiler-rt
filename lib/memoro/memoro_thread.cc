@@ -22,6 +22,7 @@
 
 namespace __memoro {
 
+THREADLOCAL uptr current_stack_end;
 static ThreadRegistry *thread_registry;
 
 static ThreadContextBase *CreateThreadContext(u32 tid) {
@@ -58,6 +59,8 @@ void ThreadContext::OnStarted(void *arg) {
   cache_begin_ = args->cache_begin;
   cache_end_ = args->cache_end;
   dtls_ = args->dtls;
+
+  current_stack_end = args->stack_end;
 }
 
 void ThreadContext::OnFinished() {

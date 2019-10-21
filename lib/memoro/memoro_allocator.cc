@@ -237,89 +237,8 @@ MemoroMetadata::MemoroMetadata(uptr chunk) {
   CHECK(metadata_);
 }
 
-bool MemoroMetadata::allocated() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->allocated;
-}
-
-uptr MemoroMetadata::requested_size() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
-}
-
-u32 MemoroMetadata::stack_trace_id() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
-}
-
-u64 MemoroMetadata::timestamp_start() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->timestamp;
-}
-
-void MemoroMetadata::set_latest_timestamp(u64 ts) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp = ts;
-}
-
-void MemoroMetadata::set_first_timestamp(u64 ts) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp = ts;
-}
-
-u8 MemoroMetadata::num_reads() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
-}
-
-u8 MemoroMetadata::num_writes() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
-}
-
-void MemoroMetadata::incr_reads() {
-  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
-  if (chunkmeta->num_reads < MAX_READWRITES)
-    chunkmeta->num_reads++;
-}
-
-void MemoroMetadata::incr_writes() {
-  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
-  if (chunkmeta->num_writes < MAX_READWRITES)
-    chunkmeta->num_writes++;
-}
-
-u64 MemoroMetadata::first_timestamp() {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp;
-}
-
-u64 MemoroMetadata::latest_timestamp() {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp;
-}
-
-u32 MemoroMetadata::creating_thread() {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->creating_thread;
-}
-
-void MemoroMetadata::set_multi_thread() {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread = 1;
-}
-
-u8 MemoroMetadata::multi_thread() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread;
-}
-
-u64 MemoroMetadata::alloc_call_time() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->alloc_call_time;
-}
-
 void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
-}
-
-u32 MemoroMetadata::interval_low() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low;
-}
-u32 MemoroMetadata::interval_high() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high;
-}
-void MemoroMetadata::set_interval_low(u32 value) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low = value;
-}
-void MemoroMetadata::set_interval_high(u32 value) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high = value;
 }
 
 } // namespace __memoro

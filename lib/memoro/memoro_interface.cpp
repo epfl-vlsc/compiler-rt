@@ -71,7 +71,7 @@ static void OnExit() {
   // Make sure we don't collect data anymore as
   // the symbolizer can be compiled with Memoro
   flags->register_allocs = false;
-  flags->register_accesses = false;
+  flags->access_sampling_rate = 0;
 
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp

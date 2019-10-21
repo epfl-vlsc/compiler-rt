@@ -49,6 +49,7 @@ void InitializeInterceptors();
 void ReplaceSystemMalloc();
 
 void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite);
+void checkStackAccess(void *Addr);
 
 #define ENSURE_MEMORO_INITED()                                                 \
   do {                                                                         \
@@ -65,8 +66,9 @@ extern atomic_uint64_t allocators_hits;
 extern atomic_uint64_t primary_time;
 extern atomic_uint64_t allocators_time;
 extern atomic_uint64_t update_time;
+extern atomic_uint64_t filter_time;
 
-#define MEMORO_METRICS
+/* #define MEMORO_METRICS */
 
 #ifdef MEMORO_METRICS
 #define MEMORO_METRIC_ADD(atomic_var, val) (atomic_fetch_add(&(atomic_var), (val), memory_order_relaxed))

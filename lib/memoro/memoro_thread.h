@@ -47,13 +47,16 @@ private:
 void InitializeThreadRegistry();
 // Returns a single instance of registry.
 ThreadRegistry &memoroThreadRegistry();
-
 void ThreadStart(u32 tid, uptr os_id, bool workerthread = false);
 void ThreadFinish();
 u32 ThreadCreate(u32 tid, uptr uid, bool detached);
 void ThreadJoin(u32 tid);
 u32 ThreadTid(uptr uid);
 
+extern THREADLOCAL uptr current_stack_end;
+inline uptr GetCurrentStackEnd() {
+  return current_stack_end;
+}
 u32 GetCurrentThread();
 void SetCurrentThread(u32 tid);
 ThreadContext *CurrentThreadContext();
