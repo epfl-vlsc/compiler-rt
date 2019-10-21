@@ -397,6 +397,7 @@ struct MemoroInterceptorContext {
 
 // realpath interceptor does something weird with wrapped malloc on mac OS
 #undef SANITIZER_INTERCEPT_REALPATH
+#undef SANITIZER_INTERCEPT_TLS_GET_ADDR
 #include "sanitizer_common/sanitizer_common_interceptors.inc"
 
 ///// Thread initialization and finalization. /////
