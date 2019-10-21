@@ -21,6 +21,7 @@
 
 #include "memoro_tracewriter.h"
 #include "sanitizer_common/sanitizer_file.h"
+#include "sanitizer_common/sanitizer_posix.h"
 #include <unistd.h>
 
 namespace __memoro {
@@ -61,7 +62,7 @@ TraceWriter::TraceWriter(u64 trace_count, u64 chunk_count) {
   }
 
   off_t trace_start = sizeof(Header) + trace_index_length;
-  off_t ret = internal_lseek(trace_outfile, trace_start, SEEK_SET);
+  off_t ret = lseek(trace_outfile, trace_start, SEEK_SET);
   if (ret == -1) {
     Printf("lseek trace file failed!");
     Die();
@@ -76,7 +77,7 @@ TraceWriter::TraceWriter(u64 trace_count, u64 chunk_count) {
   }
 
   off_t chunk_start = sizeof(Header) + chunk_index_length;
-  ret = internal_lseek(chunk_outfile, chunk_start, SEEK_SET);
+  ret = lseek(chunk_outfile, chunk_start, SEEK_SET);
   if (ret == -1) {
     Printf("lseek chunk file failed!");
     Die();
@@ -174,7 +175,7 @@ bool TraceWriter::OutputFiles() {
   flush(chunk_outfile, chunk_buffer, chunk_buffer_position);
 
   // TRACES
-  off_t off = internal_lseek(trace_outfile, 0, SEEK_SET);
+  off_t off = lseek(trace_outfile, 0, SEEK_SET);
   if (off == -1) {
     Printf("lseek trace file failed!");
     return false;
@@ -195,7 +196,7 @@ bool TraceWriter::OutputFiles() {
   // CHUNKS
   header.index_size = chunk_index_size;
 
-  off = internal_lseek(chunk_outfile, 0, SEEK_SET);
+  off = lseek(chunk_outfile, 0, SEEK_SET);
   if (off == -1) {
     Printf("lseek chunk file failed!");
     return false;
