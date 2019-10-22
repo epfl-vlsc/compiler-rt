@@ -32,5 +32,20 @@ MEMORO_FLAG(bool, verbose_chunks, false,
             "If set, output all recorded chunks at each allocation point.")
 MEMORO_FLAG(bool, no_output, false,
             "Do not output trace or chunk files. Mostly used for testing.")
+MEMORO_FLAG(
+  bool, register_allocs, false,
+  "If false, stop registering allocations and frees.")
+MEMORO_FLAG(
+  bool, register_multi_thread, false,
+  "If true, register if an allocation is used by multiple threads.")
+MEMORO_FLAG(
+  int, access_sampling_rate, 999,
+  "If set to 0, disable registering accesses. "
+  "If set to 1, registers all accesses. "
+  "Else, register every 1/#N accesses.")
+MEMORO_FLAG(
+  bool, check_stack_accesses, false,
+  "If checking stack accesses was enable at compile-time, this disable them.")
+
 // we may want to keep the suppressions file, it maybe useful in future
 // MEMORO_FLAG(const char *, suppressions, "", "Suppressions file name.")

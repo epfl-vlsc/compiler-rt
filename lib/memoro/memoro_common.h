@@ -89,6 +89,29 @@ uptr GetUserBegin(uptr chunk);
 // Return the linker module, if valid for the platform.
 LoadedModule *GetLinker();
 
+#define MAX_READWRITES 255
+
+struct ChunkMetadata {
+  u8 allocated : 8; // Must be first.
+  u8 num_reads : 8;
+  u8 num_writes : 8;
+  u8 multi_thread : 8;
+#if SANITIZER_WORDSIZE == 64
+  uptr requested_size : 64;
+#else
+  uptr requested_size : 32;
+  uptr padding : 32;
+#endif
+  u32 stack_trace_id : 32;
+  u32 creating_thread;
+  u64 timestamp;
+  u64 latest_timestamp;
+  u64 first_timestamp;
+  u64 alloc_call_time;
+  u32 access_interval_low = 0xffffffff;
+  u32 access_interval_high = 0;
+};
+
 // Wrapper for chunk metadata operations.
 class MemoroMetadata {
 public:
@@ -117,6 +140,87 @@ public:
   // private:
   void *metadata_;
 };
+
+inline bool MemoroMetadata::allocated() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->allocated;
+}
+
+inline uptr MemoroMetadata::requested_size() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
+}
+
+inline u32 MemoroMetadata::stack_trace_id() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
+}
+
+inline u64 MemoroMetadata::timestamp_start() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->timestamp;
+}
+
+inline void MemoroMetadata::set_latest_timestamp(u64 ts) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp = ts;
+}
+
+inline void MemoroMetadata::set_first_timestamp(u64 ts) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp = ts;
+}
+
+inline u8 MemoroMetadata::num_reads() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
+}
+
+inline u8 MemoroMetadata::num_writes() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
+}
+
+inline void MemoroMetadata::incr_reads() {
+  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
+  if (chunkmeta->num_reads < MAX_READWRITES)
+    chunkmeta->num_reads++;
+}
+
+inline void MemoroMetadata::incr_writes() {
+  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
+  if (chunkmeta->num_writes < MAX_READWRITES)
+    chunkmeta->num_writes++;
+}
+
+inline u64 MemoroMetadata::first_timestamp() {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp;
+}
+
+inline u64 MemoroMetadata::latest_timestamp() {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp;
+}
+
+inline u32 MemoroMetadata::creating_thread() {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->creating_thread;
+}
+
+inline void MemoroMetadata::set_multi_thread() {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread = 1;
+}
+
+inline u8 MemoroMetadata::multi_thread() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread;
+}
+
+inline u64 MemoroMetadata::alloc_call_time() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->alloc_call_time;
+}
+
+inline u32 MemoroMetadata::interval_low() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low;
+}
+inline u32 MemoroMetadata::interval_high() const {
+  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high;
+}
+inline void MemoroMetadata::set_interval_low(u32 value) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low = value;
+}
+inline void MemoroMetadata::set_interval_high(u32 value) {
+  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high = value;
+}
 
 } // namespace __memoro
 

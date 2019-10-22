@@ -22,6 +22,7 @@
 
 namespace __memoro {
 
+THREADLOCAL uptr current_stack_end;
 static ThreadRegistry *thread_registry;
 
 static ThreadContextBase *CreateThreadContext(u32 tid) {
@@ -58,6 +59,8 @@ void ThreadContext::OnStarted(void *arg) {
   cache_begin_ = args->cache_begin;
   cache_end_ = args->cache_end;
   dtls_ = args->dtls;
+
+  current_stack_end = args->stack_end;
 }
 
 void ThreadContext::OnFinished() {
@@ -70,7 +73,7 @@ u32 ThreadCreate(u32 parent_tid, uptr user_id, bool detached) {
                                        /* arg */ nullptr);
 }
 
-void ThreadStart(u32 tid, uptr os_id) {
+void ThreadStart(u32 tid, uptr os_id, bool workerthread) {
   OnStartedArgs args;
   uptr stack_size = 0;
   uptr tls_size = 0;
@@ -80,7 +83,7 @@ void ThreadStart(u32 tid, uptr os_id) {
   args.tls_end = args.tls_begin + tls_size;
   GetAllocatorCacheRange(&args.cache_begin, &args.cache_end);
   args.dtls = DTLS_Get();
-  thread_registry->StartThread(tid, os_id, false, &args);
+  thread_registry->StartThread(tid, os_id, workerthread, &args);
 }
 
 void ThreadFinish() {

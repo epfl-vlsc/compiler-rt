@@ -53,11 +53,19 @@ typedef InternalMmapVectorNoCtor<MemoroMemoryChunk> ChunkVec;
 struct MemoroStackAndChunks {
   StackTrace st;
   ChunkVec *chunks;
+  SpinMutex *lock;
 
-  MemoroStackAndChunks() : chunks(nullptr) {}
-  MemoroStackAndChunks(const StackTrace &_st) : st(_st), chunks(nullptr) {}
+  MemoroStackAndChunks() : chunks(nullptr), lock(nullptr) {}
+  MemoroStackAndChunks(const StackTrace &_st) : st(_st), chunks(nullptr), lock(nullptr) {}
   MemoroStackAndChunks(const StackTrace &_st, ChunkVec *_chunks)
-      : st(_st), chunks(_chunks) {}
+      : st(_st), chunks(_chunks), lock(nullptr) {}
+  MemoroStackAndChunks(const StackTrace &_st, ChunkVec *_chunks, SpinMutex *_lock)
+      : st(_st), chunks(_chunks), lock(_lock) {}
+
+  void PushChunk(const MemoroMemoryChunk& chunk) {
+      SpinMutexLock l(lock);
+      chunks->push_back(chunk);
+  }
 };
 
 // StackDepot efficiently stores huge amounts of stack traces.
@@ -76,6 +84,7 @@ typedef void (*ForEachStackTraceCb)(const MemoroStackAndChunks &handle,
                                     void *arg);
 const int kStackDepotMaxUseCount = 1U << 20;
 
+void InitializeDepotLock();
 MemoroStackDepotHandle MemoroStackDepotPut_WithHandle(StackTrace stack);
 MemoroStackAndChunks MemoroStackDepotGet(u32 id);
 void MemoroStackDepot_ForEachStackTrace(ForEachStackTraceCb func, void *arg);

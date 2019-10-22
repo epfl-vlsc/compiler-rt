@@ -50,7 +50,7 @@ DECLARE_REAL_AND_INTERCEPTOR(void, free, void *)
 #if !SANITIZER_MAC
 
 static uptr allocated_for_dlsym;
-static const uptr kDlsymAllocPoolSize = 1024;
+static const uptr kDlsymAllocPoolSize = 1024 * 1024;
 static uptr alloc_memory_for_dlsym[kDlsymAllocPoolSize];
 
 static bool IsInDlsymAllocPool(const void *ptr) {
@@ -397,6 +397,7 @@ struct MemoroInterceptorContext {
 
 // realpath interceptor does something weird with wrapped malloc on mac OS
 #undef SANITIZER_INTERCEPT_REALPATH
+#undef SANITIZER_INTERCEPT_TLS_GET_ADDR
 #include "sanitizer_common/sanitizer_common_interceptors.inc"
 
 ///// Thread initialization and finalization. /////

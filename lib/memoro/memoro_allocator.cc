@@ -18,6 +18,7 @@
 #include "memoro_stackdepot.h"
 #include "memoro_thread.h"
 #include "memoro_timer.h"
+#include "memoro_flags.h"
 #include "sanitizer_common/sanitizer_allocator_checks.h"
 #include "sanitizer_common/sanitizer_allocator_interface.h"
 #include "sanitizer_common/sanitizer_errno_codes.h"
@@ -35,30 +36,32 @@ void InitializeAllocator() {
       common_flags()->allocator_release_to_os_interval_ms);
 }
 
-bool PointerIsAllocator(void *p) {
-  /* return allocator.PointerIsMineUnsafe(p); */
-  return allocator.PointerIsMine(p);
+void PrintStats() {
+  allocator.PrintStats();
 }
 
 void AllocatorThreadFinish() { allocator.SwallowCache(GetAllocatorCache()); }
 
-void *GetBlockBegin(void *p) {
+void *GetBlockBegin(const void *p, bool *is_primary) {
   /* return allocator.GetBlockBeginUnsafe(p); */
   return allocator.GetBlockBegin(p);
 }
 
 static ChunkMetadata *Metadata(const void *p) {
-  /* void * p_begin = allocator.GetBlockBeginUnsafe(p); */
-  void *p_begin = allocator.GetBlockBegin(p);
-  return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p_begin));
+  return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p));
 }
 
 static void RegisterAllocation(const StackTrace &stack, void *p, uptr size,
                                u64 ts) {
-  if (!p)
-    return;
+  // At least initialize the stack_trace_id
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
+  m->stack_trace_id = 0;
+
+  if (!getFlags()->register_allocs)
+    return;
+  if (!p)
+    return;
   // TODO tag with thread id?
   m->requested_size = size; // This must always be present, or memoro_mz_size
                             // fails (and so does malloc_zone_from_ptr on Mac).
@@ -82,13 +85,19 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size,
 }
 
 static void RegisterDeallocation(void *p) {
-  if (!p)
+  if (!getFlags()->register_allocs)
     return;
-  // get dealloc timestamp
-  u64 ts = get_timestamp();
+
+  p = GetBlockBegin(p);
+  if (p == nullptr)
+    return;
+
   ChunkMetadata *m = Metadata(p);
-  // u64 diff_ns = timestamp_diff(m->timestamp, ts);
   CHECK(m);
+
+  if (m->stack_trace_id == 0)
+    return;
+
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
 
   // store the record of this chunk along with its allocation point stack trace
@@ -97,7 +106,7 @@ static void RegisterDeallocation(void *p) {
   MemoroMemoryChunk chunk;
   chunk.allocated = 0;
   chunk.timestamp_start = m->timestamp;
-  chunk.timestamp_end = ts;
+  chunk.timestamp_end = get_timestamp();
   chunk.size = m->requested_size;
   chunk.num_writes = m->num_writes;
   chunk.num_reads = m->num_reads;
@@ -107,7 +116,8 @@ static void RegisterDeallocation(void *p) {
   chunk.multi_thread = m->multi_thread;
   chunk.access_interval_low = m->access_interval_low;
   chunk.access_interval_high = m->access_interval_high;
-  sl.chunks->push_back(chunk);
+  /* sl.chunks->push_back(chunk); */
+  sl.PushChunk(chunk);
 }
 
 void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
@@ -158,9 +168,11 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 }
 
 uptr GetMallocUsableSize(const void *p) {
-  ChunkMetadata *m = Metadata(p);
-  if (!m)
+  p = GetBlockBegin(p);
+  if (!p)
     return 0;
+
+  ChunkMetadata *m = Metadata(p);
   return m->requested_size;
 }
 
@@ -220,94 +232,13 @@ void GetAllocatorGlobalRange(uptr *begin, uptr *end) {
 uptr GetUserBegin(uptr chunk) { return chunk; }
 
 MemoroMetadata::MemoroMetadata(uptr chunk) {
-  metadata_ = Metadata(reinterpret_cast<void *>(chunk));
+  metadata_ = Metadata(reinterpret_cast<void *>(chunk)); // chunk is beginning
   // Printf("metadata pointer for %%lld is %lld\n", chunk, metadata_);
   CHECK(metadata_);
 }
 
-bool MemoroMetadata::allocated() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->allocated;
-}
-
-uptr MemoroMetadata::requested_size() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
-}
-
-u32 MemoroMetadata::stack_trace_id() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
-}
-
-u64 MemoroMetadata::timestamp_start() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->timestamp;
-}
-
-void MemoroMetadata::set_latest_timestamp(u64 ts) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp = ts;
-}
-
-void MemoroMetadata::set_first_timestamp(u64 ts) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp = ts;
-}
-
-u8 MemoroMetadata::num_reads() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_reads;
-}
-
-u8 MemoroMetadata::num_writes() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->num_writes;
-}
-
-void MemoroMetadata::incr_reads() {
-  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
-  if (chunkmeta->num_reads < MAX_READWRITES)
-    chunkmeta->num_reads++;
-}
-
-void MemoroMetadata::incr_writes() {
-  auto chunkmeta = reinterpret_cast<ChunkMetadata *>(metadata_);
-  if (chunkmeta->num_writes < MAX_READWRITES)
-    chunkmeta->num_writes++;
-}
-
-u64 MemoroMetadata::first_timestamp() {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->first_timestamp;
-}
-
-u64 MemoroMetadata::latest_timestamp() {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->latest_timestamp;
-}
-
-u32 MemoroMetadata::creating_thread() {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->creating_thread;
-}
-
-void MemoroMetadata::set_multi_thread() {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread = 1;
-}
-
-u8 MemoroMetadata::multi_thread() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->multi_thread;
-}
-
-u64 MemoroMetadata::alloc_call_time() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->alloc_call_time;
-}
-
 void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
-}
-
-u32 MemoroMetadata::interval_low() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low;
-}
-u32 MemoroMetadata::interval_high() const {
-  return reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high;
-}
-void MemoroMetadata::set_interval_low(u32 value) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_low = value;
-}
-void MemoroMetadata::set_interval_high(u32 value) {
-  reinterpret_cast<ChunkMetadata *>(metadata_)->access_interval_high = value;
 }
 
 } // namespace __memoro
@@ -339,7 +270,7 @@ SANITIZER_INTERFACE_ATTRIBUTE
 uptr __sanitizer_get_estimated_allocated_size(uptr size) { return size; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
-int __sanitizer_get_ownership(const void *p) { return Metadata(p) != nullptr; }
+int __sanitizer_get_ownership(const void *p) { return GetBlockBegin(p) != nullptr; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
 uptr __sanitizer_get_allocated_size(const void *p) {

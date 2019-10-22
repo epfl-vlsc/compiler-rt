@@ -54,6 +54,8 @@ SANITIZER_INTERFACE_ATTRIBUTE void __memoro_unaligned_store4(void *Addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_unaligned_store8(void *Addr);
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_unaligned_store16(void *Addr);
 
+SANITIZER_INTERFACE_ATTRIBUTE void __memoro_check_stack(void *Addr);
+
 // These cover unusually-sized accesses.
 SANITIZER_INTERFACE_ATTRIBUTE
 void __memoro_unaligned_loadN(void *Addr, __sanitizer::uptr Size);

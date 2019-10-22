@@ -31,7 +31,6 @@ using namespace __memoro; // NOLINT
 void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
 
   __sanitizer::u64 end_ts = *(__sanitizer::u64 *)arg;
-  chunk = GetUserBegin(chunk);
   MemoroMetadata m(chunk);
   // at the end, we only care about chunks that are still allocated
   if (m.allocated()) {
@@ -49,7 +48,8 @@ void AddStillAllocatedCb(__sanitizer::uptr chunk, void *arg) {
     newchunk.multi_thread = m.multi_thread();
     newchunk.access_interval_low = m.interval_low();
     newchunk.access_interval_high = m.interval_high();
-    sl.chunks->push_back(newchunk);
+    /* sl.chunks->push_back(newchunk); */
+    sl.PushChunk(newchunk);
   }
 }
 
@@ -60,10 +60,18 @@ void TallyAllocationPoint(const MemoroStackAndChunks &sc, void *arg) {
 
 // start timestamp to get relative chunk lifetimes
 static __sanitizer::u64 memoro_start;
-
+extern "C" { void __memoro_report(); }
 static void OnExit() {
-  if (getFlags()->no_output)
+  __memoro_report();
+
+  Flags *flags = getFlags();
+  if (flags->no_output)
     return;
+
+  // Make sure we don't collect data anymore as
+  // the symbolizer can be compiled with Memoro
+  flags->register_allocs = false;
+  flags->access_sampling_rate = 0;
 
   // add remaining still-allocated chunks to the stack depot
   // structure, use program end as the end timestamp
@@ -78,10 +86,20 @@ static void OnExit() {
   InternalMmapVector<MemoroStackAndChunks> all_alloc_points;
   MemoroStackDepot_ForEachStackTrace(TallyAllocationPoint, &all_alloc_points);
 
+  __sanitizer::u64 trace_count = all_alloc_points.size();
+  __sanitizer::u64 chunk_count = 0;
+  for (const auto& alloc_point : all_alloc_points)
+    chunk_count += alloc_point.chunks->size();
+
+  if (trace_count == 0 || chunk_count == 0) {
+    Printf("Memoro: no profile collected!\n");
+    return;
+  }
+
   // write all alloc points and chunks to file
-  const __sanitizer::uptr buflen = 1024 * 1024;
-  char buf[buflen]; // 1MB because i dont care
-  TraceWriter writer(1024, 1024 * 1024);
+  const __sanitizer::uptr buflen = 2 * 1024 * 1024; // 2MiB because i dont care
+  char *buf = new char[buflen];
+  TraceWriter writer(trace_count, chunk_count);
 
   for (uptr i = 0; i < all_alloc_points.size(); i++) {
     const MemoroStackAndChunks &alloc_point = all_alloc_points[i];
@@ -90,6 +108,7 @@ static void OnExit() {
     writer.WriteTrace(buf);
 
     for (auto &chunk : *alloc_point.chunks) {
+      chunk.stack_index = i;
       chunk.timestamp_start = chunk.timestamp_start - memoro_start;
       chunk.timestamp_end = chunk.timestamp_end - memoro_start;
       chunk.timestamp_first_access = chunk.timestamp_first_access > 0
@@ -99,10 +118,15 @@ static void OnExit() {
       if (chunk.access_interval_high != 0 &&
           chunk.access_interval_high - chunk.access_interval_low > chunk.size)
         Printf("WARNING: chunk had access interval larger than size\n");
+      // Clear 0xffffffff from chunk.access_interval_low if there was no read
+      if (chunk.num_reads == 0 && chunk.num_writes == 0)
+        chunk.access_interval_low = chunk.access_interval_high = 0;
 
-      writer.WriteChunk(chunk, i);
+      writer.WriteChunk(chunk);
     }
   }
+
+  delete[] buf;
 
   if (!writer.OutputFiles())
     Printf("Error writing trace or chunk files!\n");
@@ -118,6 +142,7 @@ extern "C" void __memoro_init() {
   AvoidCVE_2016_2143();
   InitializeFlags();
   InitializeAllocator();
+  InitializeDepotLock();
   ReplaceSystemMalloc();
   InitTlsSize();
   InitializeInterceptors();
@@ -220,12 +245,27 @@ void __memoro_unaligned_storeN(void *Addr, __sanitizer::uptr Size) {
   processRangeAccess(GET_CALLER_PC(), (__sanitizer::uptr)Addr, Size, true);
 }
 
+void __memoro_check_stack(void *Addr) {
+  checkStackAccess(Addr);
+}
+
 // Public interface:
 // stuart: these can probably be removed
 extern "C" {
-SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {}
+SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {
+  Printf("=== MEMORO REPORT with Fast Delivery ===\n");
+  Printf("Total hits: %zd\n", atomic_load_relaxed(&total_hits));
+  Printf("Stack/Sample hits: %zd/%zd\n", atomic_load_relaxed(&stack_hits), atomic_load_relaxed(&sample_hits));
+  Printf("Filter time: %zd\n", atomic_load_relaxed(&filter_time));
+  Printf("Primary/Allocators hits: %zd/%zd\n", atomic_load_relaxed(&primary_hits), atomic_load_relaxed(&allocators_hits));
+  Printf("Primary/Allocators time: %zd/%zd\n", atomic_load_relaxed(&primary_time), atomic_load_relaxed(&allocators_time));
+  Printf("Total update time: %zd\n", atomic_load_relaxed(&update_time));
+  PrintStats();
+}
 
 SANITIZER_INTERFACE_ATTRIBUTE unsigned int __memoro_get_sample_count() {
   return 0;
 }
+
+SANITIZER_INTERFACE_ATTRIBUTE Flags* __memoro_get_flags() { return getFlags(); }
 } // extern "C"

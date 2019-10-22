@@ -21,6 +21,8 @@
 
 #include "memoro_tracewriter.h"
 #include "sanitizer_common/sanitizer_file.h"
+#include "sanitizer_common/sanitizer_posix.h"
+#include <unistd.h>
 
 namespace __memoro {
 
@@ -32,89 +34,133 @@ struct __attribute__((packed)) Header {
   u32 index_size;
 };
 
-TraceWriter::TraceWriter(u64 index_size, u64 data_size) {
-  trace_index = (char *)MmapOrDie(index_size, "tracewriterbuffer");
-  chunk_index = (char *)MmapOrDie(index_size, "tracewriterbuffer");
-  chunk_data = (char *)MmapOrDie(data_size, "tracewriterbuffer");
-  trace_data = (char *)MmapOrDie(data_size, "tracewriterbuffer");
-  trace_data_length = data_size;
-  chunk_data_length = data_size;
-  trace_index_length = index_size;
-  chunk_index_length = index_size;
+TraceWriter::TraceWriter(u64 trace_count, u64 chunk_count) {
+  // Indexes store the offset of items in the file, since traces are variable length
+  trace_index_size = trace_count;
+  chunk_index_size = chunk_count;
+  trace_index_length = trace_count * sizeof(RelativeIndex);
+  chunk_index_length = chunk_count * sizeof(RelativeIndex);
+  trace_index = (char *)MmapOrDie(trace_index_length, "tracewriterindexbuffer");
+  chunk_index = (char *)MmapOrDie(chunk_index_length, "tracewriterindexbuffer");
+
+  // Buffers speed up writting to disk OnExit()
+  trace_buffer_length = 64 * 1024 * 1024;
+  chunk_buffer_length = 64 * 1024 * 1024;
+  trace_buffer = (char *)MmapOrDie(trace_buffer_length, "tracewriterbuffer");
+  chunk_buffer = (char *)MmapOrDie(chunk_buffer_length, "tracewriterbuffer");
+
+  char namebuf[4096];
+  uptr pid = internal_getpid();
+  const char* pname = GetProcessName();
+
+  // Opening trace file
+  internal_snprintf(namebuf, 4096, "%s-%d.trace", pname, pid);
+  trace_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
+  if (trace_outfile == kInvalidFd) {
+    Printf("open trace file failed!");
+    Die();
+  }
+
+  off_t trace_start = sizeof(Header) + trace_index_length;
+  off_t ret = lseek(trace_outfile, trace_start, SEEK_SET);
+  if (ret == -1) {
+    Printf("lseek trace file failed!");
+    Die();
+  }
+
+  // Opening chunk file
+  internal_snprintf(namebuf, 4096, "%s-%d.chunks", pname, pid);
+  chunk_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
+  if (chunk_outfile == kInvalidFd) {
+    Printf("open chunk file failed!");
+    Die();
+  }
+
+  off_t chunk_start = sizeof(Header) + chunk_index_length;
+  ret = lseek(chunk_outfile, chunk_start, SEEK_SET);
+  if (ret == -1) {
+    Printf("lseek chunk file failed!");
+    Die();
+  }
 }
 
-void TraceWriter::WriteChunk(MemoroMemoryChunk &chunk, u32 trace_index) {
-  // Printf("writing chunk \n");
-
-  RelativeIndex size = static_cast<u16>(sizeof(MemoroMemoryChunk));
-  if (chunk_index_length - chunk_index_position < sizeof(size)) {
-    resize(chunk_index, chunk_index_length); // double
-  }
+void TraceWriter::WriteChunk(MemoroMemoryChunk &chunk) {
+  // Append chunk index (TODO: remove!)
+  size_t id_size = sizeof(RelativeIndex);
+  size_t chunk_size = sizeof(MemoroMemoryChunk);
+  // TODO: Should not be needed
+  /* if (UNLIKELY(chunk_index_length - chunk_index_position < id_size)) */
+  /*   resize(chunk_index, chunk_index_length); */
   internal_memcpy(chunk_index + chunk_index_position,
-                  reinterpret_cast<const char *>(&size), sizeof(size));
-  chunk_index_position += sizeof(size);
-  chunk_index_size++;
+                  reinterpret_cast<const char*>(&chunk_size), id_size);
+  chunk_index_position += id_size;
 
-  chunk.stack_index = trace_index;
-  if (chunk_data_length - chunk_data_position < sizeof(MemoroMemoryChunk)) {
-    resize(chunk_data, chunk_data_length); // double
-  }
-  internal_memcpy(chunk_data + chunk_data_position,
-                  reinterpret_cast<char *>(&chunk), sizeof(MemoroMemoryChunk));
-  chunk_data_position += sizeof(MemoroMemoryChunk);
+  // Flush chunks if out of capacity
+  if (UNLIKELY(chunk_buffer_length - chunk_buffer_position < chunk_size))
+    flush(chunk_outfile, chunk_buffer, chunk_buffer_position);
+
+  // Append chunk to buffer
+  internal_memcpy(chunk_buffer + chunk_buffer_position,
+      reinterpret_cast<const char*>(&chunk), chunk_size);
+  chunk_buffer_position += chunk_size;
 }
 
 // this version writes the stack trace addresses directly, assuming
 // that downstream tools will use the symbolizer and binary to decode
 // stuart: I haven't figure out how to do this yet
 // TODO finish implementation and integrate symbolizing into Memoro visualizer
-void TraceWriter::WriteTrace(const uptr *trace, u32 sz) {
-  Printf("the call stack size is %d\n", sz);
-  Printf("trace addrs are \n");
-  for (u32 i = 0; i < sz && trace[i]; i++) {
-    uptr pc = StackTrace::GetPreviousInstructionPc(trace[i]);
-    Printf("%llx\n", pc);
-  }
-  return;
+/* void TraceWriter::WriteTrace(const uptr *trace, u32 sz) { */
+/*   Printf("the call stack size is %d\n", sz); */
+/*   Printf("trace addrs are \n"); */
+/*   for (u32 i = 0; i < sz && trace[i]; i++) { */
+/*     uptr pc = StackTrace::GetPreviousInstructionPc(trace[i]); */
+/*     Printf("%llx\n", pc); */
+/*   } */
+/*   return; */
 
-  RelativeIndex size = static_cast<u16>(sz * sizeof(uptr)); // size in bytes
-  if (trace_index_length - trace_index_position < sizeof(size)) {
-    resize(trace_index, trace_index_length); // double
-  }
+/*   RelativeIndex size = static_cast<u16>(sz * sizeof(uptr)); // size in bytes */
+/*   if (trace_index_length - trace_index_position < sizeof(size)) { */
+/*     resize(trace_index, trace_index_length); // double */
+/*   } */
 
-  internal_memcpy(trace_index + trace_index_position,
-                  reinterpret_cast<const char *>(&size), sizeof(size));
-  trace_index_position += sizeof(size);
-  trace_index_size++;
+/*   internal_memcpy(trace_index + trace_index_position, */
+/*                   reinterpret_cast<const char *>(&size), sizeof(size)); */
+/*   trace_index_position += sizeof(size); */
+/*   trace_index_size++; */
 
-  if (trace_data_length - trace_data_position < size) {
-    resize(trace_data, trace_data_length); // double
-  }
-  internal_memcpy(trace_data + trace_data_position, trace, size);
-  trace_data_position += size;
-}
+/*   if (trace_data_length - trace_data_position < size) { */
+/*     resize(trace_data, trace_data_length); // double */
+/*   } */
+/*   internal_memcpy(trace_data + trace_data_position, trace, size); */
+/*   trace_data_position += size; */
+/* } */
 
 void TraceWriter::WriteTrace(const char *trace_string) {
-  // Printf("writing trace capacity is %d, position is %d trace is: \n %s\n",
-  // trace_data_length, trace_data_position, trace_string);
+  // Append trace index
   uptr len = internal_strlen(trace_string);
-  // trace_index.push_back((RelativeIndex) len);
-  // Printf("pushing back %d \n", len);
-
-  auto size = static_cast<RelativeIndex>(len);
-  if (trace_index_length - trace_index_position < sizeof(size)) {
-    resize(trace_index, trace_index_length); // double
-  }
+  size_t id_size = sizeof(RelativeIndex);
+  size_t trace_size = static_cast<u16>(len);
+  // TODO: Should not be needed
+  /* if (UNLIKELY(trace_index_length - trace_index_position < id_size)) */
+  /*   resize(trace_index, trace_index_length); */
   internal_memcpy(trace_index + trace_index_position,
-                  reinterpret_cast<const char *>(&size), sizeof(size));
-  trace_index_position += sizeof(size);
-  trace_index_size++;
+                  reinterpret_cast<const char *>(&trace_size), id_size);
+  trace_index_position += id_size;
 
-  if (trace_data_length - trace_data_position < len) {
-    resize(trace_data, trace_data_length); // double
-  }
-  internal_memcpy(trace_data + trace_data_position, trace_string, len);
-  trace_data_position += len;
+  // Flush traces if out of capacity
+  if (UNLIKELY(trace_buffer_length - trace_buffer_position < trace_size))
+    flush(trace_outfile, trace_buffer, trace_buffer_position);
+
+  // Append trace to buffer
+  internal_memcpy(trace_buffer + trace_buffer_position,
+      trace_string, trace_size);
+  trace_buffer_position += trace_size;
+}
+
+bool TraceWriter::flush(fd_t outfile, const char* buffer, u64 &buffer_size) {
+  bool retval = WriteLargeBufferToFile(outfile, buffer, buffer_size);
+  buffer_size = 0;
+  return retval;
 }
 
 bool TraceWriter::OutputFiles() {
@@ -125,67 +171,57 @@ bool TraceWriter::OutputFiles() {
   header.index_size = trace_index_size;
   // Printf("writer writing files ...\n");
 
-  uptr pid = internal_getpid();
-  char namebuf[4096];
-  internal_snprintf(namebuf, 4096, "%s-%d.trace", GetProcessName(), pid);
-  // Printf("Trace file written to --> %s \n", namebuf);
+  flush(trace_outfile, trace_buffer, trace_buffer_position);
+  flush(chunk_outfile, chunk_buffer, chunk_buffer_position);
 
-  fd_t memoro_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
-  if (memoro_outfile == kInvalidFd) {
-    Printf("open trace file failed!");
+  // TRACES
+  off_t off = lseek(trace_outfile, 0, SEEK_SET);
+  if (off == -1) {
+    Printf("lseek trace file failed!");
     return false;
   }
 
-  if (!WriteLargeBufferToFile(memoro_outfile, reinterpret_cast<char *>(&header), sizeof(Header))) {
+  if (!WriteLargeBufferToFile(trace_outfile, reinterpret_cast<char *>(&header), sizeof(Header))) {
     Printf("write header failed!!");
     return false;
   }
 
-  if (!WriteLargeBufferToFile(memoro_outfile, trace_index, trace_index_position)) {
+  if (!WriteLargeBufferToFile(trace_outfile, trace_index, trace_index_position)) {
     Printf("write trace index failed!!");
     return false;
   }
 
-  if (!WriteLargeBufferToFile(memoro_outfile, trace_data, trace_data_position)) {
-    Printf("write trace data failed!!");
-    return false;
-  }
+  CloseFile(trace_outfile);
 
-  CloseFile(memoro_outfile);
-
+  // CHUNKS
   header.index_size = chunk_index_size;
-  internal_snprintf(namebuf, 4096, "%s-%d.chunks", GetProcessName(), pid);
-  // Printf("Chunks file written to --> %s \n", namebuf);
 
-  memoro_outfile = OpenFile(namebuf, FileAccessMode::WrOnly);
-  if (memoro_outfile == kInvalidFd) {
-    Printf("open chunks file failed!");
+  off = lseek(chunk_outfile, 0, SEEK_SET);
+  if (off == -1) {
+    Printf("lseek chunk file failed!");
     return false;
   }
 
-  if (!WriteLargeBufferToFile(memoro_outfile, reinterpret_cast<char *>(&header), sizeof(Header))) {
+  if (!WriteLargeBufferToFile(chunk_outfile, reinterpret_cast<char *>(&header), sizeof(Header))) {
     Printf("write chunk header failed!!");
     return false;
   }
 
-  if (!WriteLargeBufferToFile(memoro_outfile, chunk_index, chunk_index_position)) {
+  if (!WriteLargeBufferToFile(chunk_outfile, chunk_index, chunk_index_position)) {
     Printf("write chunk index failed!!");
     return false;
   }
 
-  if (!WriteLargeBufferToFile(memoro_outfile, chunk_data, chunk_data_position)) {
-    Printf("write chunk data failed!!");
-    return false;
-  }
-
-  CloseFile(memoro_outfile);
+  CloseFile(chunk_outfile);
 
   return true;
 }
 
 TraceWriter::~TraceWriter() {
-  UnmapOrDie(trace_data, trace_data_length);
-  UnmapOrDie(chunk_data, chunk_data_length);
+  UnmapOrDie(trace_index, trace_index_length);
+  UnmapOrDie(chunk_index, chunk_index_length);
+  UnmapOrDie(trace_buffer, trace_buffer_length);
+  UnmapOrDie(chunk_buffer, chunk_buffer_length);
 }
 
 bool TraceWriter::WriteLargeBufferToFile(const fd_t outfile, const char *buffer, const u64 buffer_size) {
