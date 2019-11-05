@@ -37,9 +37,7 @@ atomic_uint64_t allocators_time;
 atomic_uint64_t update_time;
 atomic_uint64_t filter_time;
 
-// THREADLOCAL is not portable on macOS
-/* THREADLOCAL uptr sample_hits_noatomic; */
-uptr sample_hits_noatomic;
+THREADLOCAL uptr sample_hits_noatomic;
 
 // Detect if the memory (Addr) being accessed is on the heap by asking
 // the allocator. If it is, get the metadata for that heap chunk
