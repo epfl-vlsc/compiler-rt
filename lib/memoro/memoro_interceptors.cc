@@ -27,6 +27,7 @@
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
 
 #include <stddef.h>
+#include <alloca.h>
 
 using namespace __memoro;
 
@@ -286,9 +287,24 @@ void operator delete[](void *ptr, size_t size, std::align_val_t align) NOEXCEPT
 { OPERATOR_DELETE_BODY; }
 
 #define MEMORO_READ_RANGE(ctx, offset, size)                                   \
-  processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, false)
+  do {                                                                         \
+    if (getFlags()->access_sampling_rate != 0) {                               \
+      uptr rsp = (uptr)alloca(0);                                              \
+      uptr uoffset = (uptr)offset;                                             \
+      if (uoffset < rsp || GetCurrentStackEnd() <= uoffset)                    \
+        processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, false);        \
+    }                                                                          \
+  } while (false)
+
 #define MEMORO_WRITE_RANGE(ctx, offset, size)                                  \
-  processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, true)
+  do {                                                                         \
+    if (getFlags()->access_sampling_rate != 0) {                               \
+      uptr rsp = (uptr)alloca(0);                                              \
+      uptr uoffset = (uptr)offset;                                             \
+      if (uoffset < rsp || GetCurrentStackEnd() <= uoffset)                    \
+        processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, true);         \
+    }                                                                          \
+  } while (false)
 
 // Behavior of functions like "memcpy" or "strcpy" is undefined
 // if memory intervals overlap. We report error in this case.

@@ -253,11 +253,9 @@ extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {
   Printf("=== MEMORO REPORT ===\n");
   Printf("Total hits: %zd\n", atomic_load_relaxed(&total_hits));
-  Printf("Stack/Sample hits: %zd/%zd\n", atomic_load_relaxed(&stack_hits), atomic_load_relaxed(&sample_hits));
   Printf("Primary/Allocators hits: %zd/%zd\n", atomic_load_relaxed(&primary_hits), atomic_load_relaxed(&allocators_hits));
   Printf("Primary/Allocators time: %zd/%zd\n", atomic_load_relaxed(&primary_time), atomic_load_relaxed(&allocators_time));
   Printf("Total update time: %zd\n", atomic_load_relaxed(&update_time));
-  Printf("Filter time: %zd\n", atomic_load_relaxed(&filter_time));
   PrintStats();
 }
 

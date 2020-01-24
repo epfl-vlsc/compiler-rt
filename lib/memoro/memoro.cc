@@ -26,18 +26,15 @@ namespace __memoro {
 
 atomic_uint64_t total_hits;
 
-atomic_uint64_t stack_hits;
-atomic_uint64_t sample_hits;
-
 atomic_uint64_t primary_hits;
 atomic_uint64_t allocators_hits;
 
 atomic_uint64_t primary_time;
 atomic_uint64_t allocators_time;
 atomic_uint64_t update_time;
-atomic_uint64_t filter_time;
 
-THREADLOCAL uptr sample_hits_noatomic;
+// Init at 1 so, on first hit, it doesn't underflow when decremented
+THREADLOCAL uptr sample_hits_noatomic = 1;
 
 // Detect if the memory (Addr) being accessed is on the heap by asking
 // the allocator. If it is, get the metadata for that heap chunk
@@ -46,28 +43,10 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
   /*  VPrintf(3, "in memoro::%s %p: %c %p %d\n", __FUNCTION__, PC,
             IsWrite ? 'w' : 'r', Addr, Size);*/
 
-  const int sampling_rate = getFlags()->access_sampling_rate;
-  if (UNLIKELY(sampling_rate == 0))
-    return;
-
   MEMORO_METRIC_ADD(total_hits, 1);
 
-  u64 start_filter = MEMORO_METRIC_TIME();
-  uptr rsp = (uptr)alloca(0);
-  if (rsp <= Addr && Addr < GetCurrentStackEnd()) {
-    MEMORO_METRIC_ADD(filter_time, MEMORO_METRIC_TIME() - start_filter);
-    MEMORO_METRIC_ADD(stack_hits, 1);
-    return;
-  }
-  MEMORO_METRIC_ADD(filter_time, MEMORO_METRIC_TIME() - start_filter);
-
-  MEMORO_METRIC_ADD(sample_hits, 1);
-
-  // Sample accesses
-  if (LIKELY(sample_hits_noatomic-- != 0))
-    return;
-
-  sample_hits_noatomic = sampling_rate - 1;
+  // Reset sample counter
+  sample_hits_noatomic = getFlags()->access_sampling_rate;
 
   bool is_primary = true;
   u64 start = MEMORO_METRIC_TIME();

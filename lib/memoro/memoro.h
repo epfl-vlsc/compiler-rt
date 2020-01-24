@@ -59,14 +59,11 @@ void checkStackAccess(void *Addr);
   } while (0)
 
 extern atomic_uint64_t total_hits;
-extern atomic_uint64_t stack_hits;
-extern atomic_uint64_t sample_hits;
 extern atomic_uint64_t primary_hits;
 extern atomic_uint64_t allocators_hits;
 extern atomic_uint64_t primary_time;
 extern atomic_uint64_t allocators_time;
 extern atomic_uint64_t update_time;
-extern atomic_uint64_t filter_time;
 
 /* #define MEMORO_METRICS */
 

@@ -21,6 +21,9 @@
 // MEMORO_FLAG(Type, Name, DefaultValue, Description)
 // See COMMON_FLAG in sanitizer_flags.inc for more details.
 
+// IMPORTANT: Changes in this file must be reflected on MemoroFlagsTy
+//            in llvm/lib/Transforms/Instrumentation/Memoro.cpp
+
 MEMORO_FLAG(
     bool, replace_str, true,
     "If set, uses custom wrappers and replacements for libc string functions "
