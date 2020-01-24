@@ -20,7 +20,9 @@ namespace __memoro {
 
 static const char MemoroOptsEnv[] = "MEMORO_OPTIONS";
 
-Flags MemoroFlagsDontUseDirectly;
+extern "C" {
+SANITIZER_INTERFACE_ATTRIBUTE Flags MemoroFlagsDontUseDirectly;
+}
 
 void Flags::setDefaults() {
 #define MEMORO_FLAG(Type, Name, DefaultValue, Description) Name = DefaultValue;
@@ -66,8 +68,8 @@ void InitializeFlags() {
   if (common_flags()->help)
     Parser.PrintFlagDescriptions();
 
-  if (F->access_sampling_rate < 1)
-    F->access_sampling_rate = INT_MAX;
+  if (F->access_sampling_rate <= 0)
+    F->access_sampling_rate = 0;
 
   __sanitizer_set_report_path(common_flags()->log_path);
 }

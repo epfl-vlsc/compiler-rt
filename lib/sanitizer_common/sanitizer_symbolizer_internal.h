@@ -101,7 +101,7 @@ class SymbolizerProcess {
   fd_t input_fd_;
   fd_t output_fd_;
 
-  static const uptr kBufferSize = 16 * 1024;
+  static const uptr kBufferSize = 1024 * 1024;
   char buffer_[kBufferSize];
 
   static const uptr kMaxTimesRestarted = 5;

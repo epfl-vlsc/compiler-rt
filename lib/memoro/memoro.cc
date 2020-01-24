@@ -52,27 +52,29 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 
   MEMORO_METRIC_ADD(total_hits, 1);
 
-  u64 start_filter /* = get_timestamp() */;
+  u64 start_filter = MEMORO_METRIC_TIME();
   uptr rsp = (uptr)alloca(0);
   if (rsp <= Addr && Addr < GetCurrentStackEnd()) {
-    MEMORO_METRIC_ADD(filter_time, get_timestamp() - start_filter);
+    MEMORO_METRIC_ADD(filter_time, MEMORO_METRIC_TIME() - start_filter);
     MEMORO_METRIC_ADD(stack_hits, 1);
     return;
   }
-  MEMORO_METRIC_ADD(filter_time, get_timestamp() - start_filter);
+  MEMORO_METRIC_ADD(filter_time, MEMORO_METRIC_TIME() - start_filter);
 
   MEMORO_METRIC_ADD(sample_hits, 1);
 
   // Sample accesses
-  if (LIKELY(sample_hits_noatomic++ % sampling_rate != 0))
+  if (LIKELY(sample_hits_noatomic-- != 0))
     return;
 
+  sample_hits_noatomic = sampling_rate - 1;
+
   bool is_primary = true;
-  u64 start /* = get_timestamp() */;
+  u64 start = MEMORO_METRIC_TIME();
   uptr p = (uptr)GetBlockBegin((void*)Addr, &is_primary);
   if (LIKELY(p)) {
     MemoroMetadata m(p);
-    u64 ts = get_timestamp();
+    u64 ts = MEMORO_METRIC_TIME();
 
     MEMORO_METRIC_ADD(allocators_hits, 1);
     MEMORO_METRIC_ADD(allocators_time, ts - start);
@@ -107,7 +109,7 @@ void processRangeAccess(uptr PC, uptr Addr, uptr Size, bool IsWrite) {
 
     return;
   }
-  MEMORO_METRIC_ADD(update_time, get_timestamp() - start);
+  MEMORO_METRIC_ADD(update_time, MEMORO_METRIC_TIME() - start);
 }
 
 void checkStackAccess(void* Addr) {

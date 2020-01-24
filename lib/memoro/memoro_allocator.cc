@@ -57,14 +57,14 @@ static void RegisterAllocation(const StackTrace &stack, void *p, uptr size,
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
   m->stack_trace_id = 0;
+  m->requested_size = size; // This must always be present, or memoro_mz_size
+                            // fails (and so does malloc_zone_from_ptr on Mac).
 
   if (!getFlags()->register_allocs)
     return;
   if (!p)
     return;
   // TODO tag with thread id?
-  m->requested_size = size; // This must always be present, or memoro_mz_size
-                            // fails (and so does malloc_zone_from_ptr on Mac).
   MemoroStackDepotHandle handle = MemoroStackDepotPut_WithHandle(stack);
   m->stack_trace_id = handle.id();
   m->num_reads = 0;

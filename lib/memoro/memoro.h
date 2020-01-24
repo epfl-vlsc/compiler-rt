@@ -72,8 +72,10 @@ extern atomic_uint64_t filter_time;
 
 #ifdef MEMORO_METRICS
 #define MEMORO_METRIC_ADD(atomic_var, val) (atomic_fetch_add(&(atomic_var), (val), memory_order_relaxed))
+#define MEMORO_METRIC_TIME() (get_timestamp())
 #else
 #define MEMORO_METRIC_ADD(atomic_var, val)
+#define MEMORO_METRIC_TIME() (0)
 #endif
 } // namespace __memoro
 

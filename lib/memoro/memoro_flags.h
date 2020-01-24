@@ -20,7 +20,7 @@
 
 namespace __memoro {
 
-class Flags {
+struct Flags {
 public:
 #define MEMORO_FLAG(Type, Name, DefaultValue, Description) Type Name;
 
@@ -31,7 +31,9 @@ public:
   void setDefaults();
 };
 
+extern "C" {
 extern Flags MemoroFlagsDontUseDirectly;
+}
 
 inline Flags *getFlags() { return &MemoroFlagsDontUseDirectly; }
 

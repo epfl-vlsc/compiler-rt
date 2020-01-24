@@ -30,6 +30,12 @@
 
 using namespace __memoro;
 
+// Fake std::nothrow_t and std::align_val_t to avoid including <new>.
+namespace std {
+struct nothrow_t {};
+enum class align_val_t: size_t {};
+}  // namespace std
+
 extern "C" {
 int pthread_attr_init(void *attr);
 int pthread_attr_destroy(void *attr);
@@ -211,6 +217,11 @@ INTERCEPTOR(void, cfree, void *p) ALIAS(WRAPPER_NAME(free));
   GET_STACK_TRACE_MALLOC;                                                      \
   return Allocate(stack, size, 1, kAlwaysClearMemory);
 
+#define OPERATOR_NEW_BODY_ALIGN                                                \
+  ENSURE_MEMORO_INITED();                                                      \
+  GET_STACK_TRACE_MALLOC;                                                      \
+  return Allocate(stack, size, (uptr)align, kAlwaysClearMemory);
+
 INTERCEPTOR_ATTRIBUTE
 void *operator new(size_t size) { OPERATOR_NEW_BODY; }
 INTERCEPTOR_ATTRIBUTE
@@ -219,6 +230,19 @@ INTERCEPTOR_ATTRIBUTE
 void *operator new(size_t size, std::nothrow_t const &) { OPERATOR_NEW_BODY; }
 INTERCEPTOR_ATTRIBUTE
 void *operator new[](size_t size, std::nothrow_t const &) { OPERATOR_NEW_BODY; }
+
+INTERCEPTOR_ATTRIBUTE
+void *operator new(size_t size, std::align_val_t align)
+{ OPERATOR_NEW_BODY_ALIGN; }
+INTERCEPTOR_ATTRIBUTE
+void *operator new[](size_t size, std::align_val_t align)
+{ OPERATOR_NEW_BODY_ALIGN; }
+INTERCEPTOR_ATTRIBUTE
+void *operator new(size_t size, std::align_val_t align, std::nothrow_t const&)
+{ OPERATOR_NEW_BODY_ALIGN; }
+INTERCEPTOR_ATTRIBUTE
+void *operator new[](size_t size, std::align_val_t align, std::nothrow_t const&)
+{ OPERATOR_NEW_BODY_ALIGN; }
 
 #define OPERATOR_DELETE_BODY                                                   \
   ENSURE_MEMORO_INITED();                                                      \
@@ -236,6 +260,30 @@ INTERCEPTOR_ATTRIBUTE
 void operator delete[](void *ptr, std::nothrow_t const &) {
   OPERATOR_DELETE_BODY;
 }
+INTERCEPTOR_ATTRIBUTE
+void operator delete(void *ptr, size_t size) NOEXCEPT
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete[](void *ptr, size_t size) NOEXCEPT
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete(void *ptr, std::align_val_t align) NOEXCEPT
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete[](void *ptr, std::align_val_t align) NOEXCEPT
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete(void *ptr, std::align_val_t align, std::nothrow_t const&)
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete[](void *ptr, std::align_val_t align, std::nothrow_t const&)
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete(void *ptr, size_t size, std::align_val_t align) NOEXCEPT
+{ OPERATOR_DELETE_BODY; }
+INTERCEPTOR_ATTRIBUTE
+void operator delete[](void *ptr, size_t size, std::align_val_t align) NOEXCEPT
+{ OPERATOR_DELETE_BODY; }
 
 #define MEMORO_READ_RANGE(ctx, offset, size)                                   \
   processRangeAccess(GET_CALLER_PC(), (uptr)offset, size, false)

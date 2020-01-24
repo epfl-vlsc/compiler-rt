@@ -39,7 +39,7 @@ MEMORO_FLAG(
   bool, register_multi_thread, false,
   "If true, register if an allocation is used by multiple threads.")
 MEMORO_FLAG(
-  int, access_sampling_rate, 999,
+  int, access_sampling_rate, 0,
   "If set to 0, disable registering accesses. "
   "If set to 1, registers all accesses. "
   "Else, register every 1/#N accesses.")

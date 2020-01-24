@@ -62,8 +62,6 @@ void TallyAllocationPoint(const MemoroStackAndChunks &sc, void *arg) {
 static __sanitizer::u64 memoro_start;
 extern "C" { void __memoro_report(); }
 static void OnExit() {
-  __memoro_report();
-
   Flags *flags = getFlags();
   if (flags->no_output)
     return;
@@ -253,13 +251,13 @@ void __memoro_check_stack(void *Addr) {
 // stuart: these can probably be removed
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE void __memoro_report() {
-  Printf("=== MEMORO REPORT with Fast Delivery ===\n");
+  Printf("=== MEMORO REPORT ===\n");
   Printf("Total hits: %zd\n", atomic_load_relaxed(&total_hits));
   Printf("Stack/Sample hits: %zd/%zd\n", atomic_load_relaxed(&stack_hits), atomic_load_relaxed(&sample_hits));
-  Printf("Filter time: %zd\n", atomic_load_relaxed(&filter_time));
   Printf("Primary/Allocators hits: %zd/%zd\n", atomic_load_relaxed(&primary_hits), atomic_load_relaxed(&allocators_hits));
   Printf("Primary/Allocators time: %zd/%zd\n", atomic_load_relaxed(&primary_time), atomic_load_relaxed(&allocators_time));
   Printf("Total update time: %zd\n", atomic_load_relaxed(&update_time));
+  Printf("Filter time: %zd\n", atomic_load_relaxed(&filter_time));
   PrintStats();
 }
 
